@@ -1,0 +1,180 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/message_provider.dart';
+import '../models/sending_state.dart';
+
+class ProgressLogPanel extends StatelessWidget {
+  const ProgressLogPanel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<MessageProvider>();
+    final theme = Theme.of(context);
+
+    final progressPercent = (provider.progress * 100).toStringAsFixed(1);
+
+    String statusLabel;
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (provider.status) {
+      case SendingStatus.idle:
+        statusLabel = 'Hazır';
+        statusColor = Colors.grey;
+        statusIcon = Icons.circle_outlined;
+        break;
+      case SendingStatus.sending:
+        statusLabel = 'Gönderiliyor...';
+        statusColor = Colors.orange;
+        statusIcon = Icons.sync;
+        break;
+      case SendingStatus.paused:
+        statusLabel = 'Durduruldu';
+        statusColor = Colors.red;
+        statusIcon = Icons.pause_circle;
+        break;
+      case SendingStatus.completed:
+        statusLabel = 'Tamamlandı';
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        break;
+    }
+
+    return Card(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Başlık + Durum göstergesi
+            Row(
+              children: [
+                Icon(Icons.terminal, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'İlerleme & Log',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                // Durum etiketi
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, size: 14, color: statusColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // İlerleme yüzdesi
+                Text(
+                  '${provider.sentCount} / ${provider.phoneCount}  •  %$progressPercent',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: provider.progress,
+                minHeight: 10,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  provider.status == SendingStatus.completed
+                      ? Colors.green
+                      : theme.colorScheme.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Log terminal kutusu
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade700),
+                ),
+                child: provider.logs.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Loglar burada görünecek...',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: provider.logScrollController,
+                        itemCount: provider.logs.length,
+                        itemBuilder: (context, index) {
+                          final log = provider.logs[index];
+                          Color logColor = Colors.grey.shade300;
+
+                          if (log.contains('[HATA]')) {
+                            logColor = Colors.redAccent;
+                          } else if (log.contains('[GÖNDER]')) {
+                            logColor = Colors.greenAccent;
+                          } else if (log.contains('[BEKLE]')) {
+                            logColor = Colors.amberAccent;
+                          } else if (log.contains('[BİLGİ]')) {
+                            logColor = Colors.lightBlueAccent;
+                          } else if (log.contains('[DURDURULDU]')) {
+                            logColor = Colors.orangeAccent;
+                          } else if (log.contains('───')) {
+                            logColor = Colors.white;
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(
+                              log,
+                              style: TextStyle(
+                                color: logColor,
+                                fontFamily: 'monospace',
+                                fontSize: 12.5,
+                                height: 1.4,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
