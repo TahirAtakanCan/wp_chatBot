@@ -15,20 +15,27 @@ class SendingSettingsPanel extends StatelessWidget {
       elevation: 1,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Icon(Icons.timer_outlined, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'Anti-Spam Ayarları',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.timer_outlined, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Anti-Spam Ayarları',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 20),
             // Min bekleme
             SizedBox(
-              width: 130,
+              width: 160,
               child: TextField(
                 controller: provider.minDelayController,
                 keyboardType: TextInputType.number,
@@ -41,10 +48,9 @@ class SendingSettingsPanel extends StatelessWidget {
                 style: const TextStyle(fontSize: 14),
               ),
             ),
-            const SizedBox(width: 12),
             // Max bekleme
             SizedBox(
-              width: 130,
+              width: 160,
               child: TextField(
                 controller: provider.maxDelayController,
                 keyboardType: TextInputType.number,
@@ -57,7 +63,6 @@ class SendingSettingsPanel extends StatelessWidget {
                 style: const TextStyle(fontSize: 14),
               ),
             ),
-            const Spacer(),
             // Bilgi etiketi
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

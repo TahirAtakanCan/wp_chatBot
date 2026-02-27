@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/sending_state.dart';
 
 class MessageProvider extends ChangeNotifier {
@@ -11,6 +13,68 @@ class MessageProvider extends ChangeNotifier {
 
   // --- Mesaj İçeriği ---
   final TextEditingController messageController = TextEditingController();
+
+  // --- Medya Ekleri ---
+  final List<PlatformFile> _attachedMedia = [];
+  List<PlatformFile> get attachedMedia => List.unmodifiable(_attachedMedia);
+  int get mediaCount => _attachedMedia.length;
+  bool get hasMedia => _attachedMedia.isNotEmpty;
+
+  /// Dosya seçici ile resim/video ekle
+  Future<void> pickMedia() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'mp4', 'avi', 'mov', 'mkv', 'webm'],
+        allowMultiple: true,
+        withData: kIsWeb,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        for (final file in result.files) {
+          // Tekrar eklemeyi engelle
+          final alreadyExists = _attachedMedia.any((f) => f.name == file.name && f.size == file.size);
+          if (!alreadyExists) {
+            _attachedMedia.add(file);
+          }
+        }
+        _addLog('[BİLGİ] ${result.files.length} medya dosyası eklendi. Toplam: $mediaCount');
+        notifyListeners();
+      }
+    } catch (e) {
+      _addLog('[HATA] Dosya seçilirken hata oluştu: $e');
+      notifyListeners();
+    }
+  }
+
+  /// Tek bir medya dosyasını kaldır
+  void removeMedia(int index) {
+    if (index >= 0 && index < _attachedMedia.length) {
+      final removed = _attachedMedia.removeAt(index);
+      _addLog('[BİLGİ] "${removed.name}" kaldırıldı. Kalan: $mediaCount');
+      notifyListeners();
+    }
+  }
+
+  /// Tüm medya dosyalarını temizle
+  void clearAllMedia() {
+    _attachedMedia.clear();
+    _addLog('[BİLGİ] Tüm medya dosyaları kaldırıldı.');
+    notifyListeners();
+  }
+
+  /// Dosya uzantısına göre resim mi kontrol et
+  bool isImageFile(PlatformFile file) {
+    final ext = file.extension?.toLowerCase() ?? '';
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext);
+  }
+
+  /// Dosya boyutunu okunabilir formata çevir
+  String formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
 
   // --- Gönderim Ayarları ---
   final TextEditingController minDelayController =
@@ -91,6 +155,9 @@ class MessageProvider extends ChangeNotifier {
     _addLog('─── Gönderim başlatıldı ───');
     _addLog(
         '[BİLGİ] Toplam ${_phoneNumbers.length} numaraya mesaj gönderilecek.');
+    if (_attachedMedia.isNotEmpty) {
+      _addLog('[BİLGİ] ${_attachedMedia.length} medya dosyası mesajla birlikte gönderilecek.');
+    }
     _addLog(
         '[BİLGİ] Bekleme aralığı: $minDelay - $maxDelay saniye.');
     notifyListeners();
@@ -113,8 +180,11 @@ class MessageProvider extends ChangeNotifier {
     final delay = minDelay +
         (DateTime.now().millisecondsSinceEpoch % (maxDelay - minDelay + 1));
 
+    final mediaInfo = _attachedMedia.isNotEmpty
+        ? ' (+${_attachedMedia.length} medya)'
+        : '';
     _addLog(
-        '[GÖNDER] $currentNumber numarasına mesaj gönderildi. ✔');
+        '[GÖNDER] $currentNumber numarasına mesaj$mediaInfo gönderildi. ✔');
 
     _sentCount++;
     notifyListeners();
@@ -155,6 +225,7 @@ class MessageProvider extends ChangeNotifier {
     _status = SendingStatus.idle;
     _sentCount = 0;
     _logs.clear();
+    _attachedMedia.clear();
     notifyListeners();
   }
 
