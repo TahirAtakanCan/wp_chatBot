@@ -1,10 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
 import '../models/sending_state.dart';
 
 class MessageProvider extends ChangeNotifier {
+  // --- API Ayarları ---
+  final String _baseUrl = 'http://localhost:8080/api/send';
+  String? _sessionId;
+  Timer? _pollingTimer;
+
   // --- Kişi Listesi ---
   final TextEditingController phoneController = TextEditingController();
   List<String> _phoneNumbers = [];
@@ -32,7 +39,6 @@ class MessageProvider extends ChangeNotifier {
 
       if (result != null && result.files.isNotEmpty) {
         for (final file in result.files) {
-          // Tekrar eklemeyi engelle
           final alreadyExists = _attachedMedia.any((f) => f.name == file.name && f.size == file.size);
           if (!alreadyExists) {
             _attachedMedia.add(file);
@@ -47,7 +53,6 @@ class MessageProvider extends ChangeNotifier {
     }
   }
 
-  /// Tek bir medya dosyasını kaldır
   void removeMedia(int index) {
     if (index >= 0 && index < _attachedMedia.length) {
       final removed = _attachedMedia.removeAt(index);
@@ -56,31 +61,37 @@ class MessageProvider extends ChangeNotifier {
     }
   }
 
-  /// Tüm medya dosyalarını temizle
   void clearAllMedia() {
     _attachedMedia.clear();
     _addLog('[BİLGİ] Tüm medya dosyaları kaldırıldı.');
     notifyListeners();
   }
 
-  /// Dosya uzantısına göre resim mi kontrol et
+  // ==========================================
+  // EKSİK OLDUĞU SÖYLENEN METODLAR BURADA
+  // ==========================================
+
+  void loadFromFile() {
+    _addLog('[BİLGİ] Dosyadan yükleme özelliği henüz aktif değil.');
+    notifyListeners();
+  }
+
   bool isImageFile(PlatformFile file) {
     final ext = file.extension?.toLowerCase() ?? '';
     return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext);
   }
 
-  /// Dosya boyutunu okunabilir formata çevir
   String formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
+  // ==========================================
+
   // --- Gönderim Ayarları ---
-  final TextEditingController minDelayController =
-      TextEditingController(text: '5');
-  final TextEditingController maxDelayController =
-      TextEditingController(text: '15');
+  final TextEditingController minDelayController = TextEditingController(text: '5');
+  final TextEditingController maxDelayController = TextEditingController(text: '15');
 
   int get minDelay => int.tryParse(minDelayController.text) ?? 5;
   int get maxDelay => int.tryParse(maxDelayController.text) ?? 15;
@@ -92,149 +103,182 @@ class MessageProvider extends ChangeNotifier {
   int _sentCount = 0;
   int get sentCount => _sentCount;
 
-  double get progress =>
-      _phoneNumbers.isEmpty ? 0.0 : _sentCount / _phoneNumbers.length;
+  double _progress = 0.0;
+  double get progress => _progress;
 
   // --- Log ---
-  final List<String> _logs = [];
+  List<String> _logs = [];
   List<String> get logs => List.unmodifiable(_logs);
-
   final ScrollController logScrollController = ScrollController();
 
-  Timer? _sendTimer;
-
-  /// Telefon numaralarını parse et
   void parsePhoneNumbers() {
     final raw = phoneController.text.trim();
     if (raw.isEmpty) {
       _phoneNumbers = [];
     } else {
-      _phoneNumbers = raw
-          .split(RegExp(r'[\n,;]+'))
+      // 1. Metni satır satır veya virgülle ayır
+      var rawList = raw.split(RegExp(r'[\n,;]+'))
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toList();
+
+      _phoneNumbers = [];
+      
+      for (var number in rawList) {
+        // 2. Sadece rakamları bırak (Boşluk, tire, parantez, + gibi işaretleri temizle)
+        var cleaned = number.replaceAll(RegExp(r'[^0-9]'), '');
+
+        // 3. Türkiye formatına (90...) dönüştür
+        if (cleaned.startsWith('0') && cleaned.length == 11) {
+          // Örnek: 05551234567 -> 905551234567 (Baştaki 0'ı at, 90 ekle)
+          cleaned = '90${cleaned.substring(1)}';
+        } 
+        else if (cleaned.length == 10 && cleaned.startsWith('5')) {
+          // Örnek: 5551234567 -> 905551234567 (Başına direkt 90 ekle)
+          cleaned = '90$cleaned';
+        } 
+        else if (cleaned.startsWith('90') && cleaned.length == 12) {
+          // Örnek: 905551234567 -> Zaten doğru format, dokunma
+        } 
+        // Not: Eğer yurt dışı numaraları da olacaksa (örneğin 49 ile başlayan Almanya),
+        // Else bloğuna düşeceği için onlara da dokunmamış oluyoruz, ham haliyle bırakıyoruz.
+
+        _phoneNumbers.add(cleaned);
+      }
     }
     notifyListeners();
   }
 
-  /// TXT/Excel'den yükleme (şimdilik placeholder)
-  void loadFromFile() {
-    _addLog('[BİLGİ] Dosyadan yükleme özelliği henüz aktif değil.');
-    notifyListeners();
-  }
+  // ==========================================
+  // API İLETİŞİM METODLARI
+  // ==========================================
 
-  /// Gönderimi başlat
-  void startSending() {
+  Future<void> startSending() async {
     if (_status == SendingStatus.sending) return;
 
     parsePhoneNumbers();
 
     if (_phoneNumbers.isEmpty) {
       _addLog('[HATA] Gönderilecek telefon numarası bulunamadı.');
-      notifyListeners();
       return;
     }
-
-    final message = messageController.text.trim();
-    if (message.isEmpty) {
+    if (messageController.text.trim().isEmpty) {
       _addLog('[HATA] Mesaj içeriği boş olamaz.');
-      notifyListeners();
-      return;
-    }
-
-    if (minDelay > maxDelay) {
-      _addLog(
-          '[HATA] Minimum bekleme süresi, maksimum bekleme süresinden büyük olamaz.');
-      notifyListeners();
       return;
     }
 
     _status = SendingStatus.sending;
     _sentCount = 0;
-    _addLog('─── Gönderim başlatıldı ───');
-    _addLog(
-        '[BİLGİ] Toplam ${_phoneNumbers.length} numaraya mesaj gönderilecek.');
-    if (_attachedMedia.isNotEmpty) {
-      _addLog('[BİLGİ] ${_attachedMedia.length} medya dosyası mesajla birlikte gönderilecek.');
-    }
-    _addLog(
-        '[BİLGİ] Bekleme aralığı: $minDelay - $maxDelay saniye.');
+    _progress = 0.0;
+    _logs.clear(); 
+    _addLog('─── Gönderim API\'ye İletiliyor ───');
     notifyListeners();
 
-    _simulateSending();
-  }
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/start'));
+      
+      request.fields['phoneNumbers'] = jsonEncode(_phoneNumbers);
+      request.fields['message'] = messageController.text.trim();
+      request.fields['minDelay'] = minDelay.toString();
+      request.fields['maxDelay'] = maxDelay.toString();
 
-  /// Simüle gönderim (gerçek API yerine demo amaçlı)
-  void _simulateSending() {
-    if (_sentCount >= _phoneNumbers.length) {
-      _status = SendingStatus.completed;
-      _addLog('─── Tüm mesajlar gönderildi ───');
-      notifyListeners();
-      return;
-    }
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
 
-    if (_status != SendingStatus.sending) return;
-
-    final currentNumber = _phoneNumbers[_sentCount];
-    final delay = minDelay +
-        (DateTime.now().millisecondsSinceEpoch % (maxDelay - minDelay + 1));
-
-    final mediaInfo = _attachedMedia.isNotEmpty
-        ? ' (+${_attachedMedia.length} medya)'
-        : '';
-    _addLog(
-        '[GÖNDER] $currentNumber numarasına mesaj$mediaInfo gönderildi. ✔');
-
-    _sentCount++;
-    notifyListeners();
-
-    if (_sentCount < _phoneNumbers.length) {
-      _addLog(
-          '[BEKLE] Sıradaki mesaj için $delay saniye bekleniyor...');
-      notifyListeners();
-
-      // TODO: Gerçek uygulamada burada HTTP isteği atılacak.
-      // Şimdilik kısa bir süre ile simüle ediyoruz.
-      _sendTimer = Timer(Duration(seconds: delay), () {
-        _simulateSending();
-      });
-    } else {
-      _status = SendingStatus.completed;
-      _addLog('─── Tüm mesajlar başarıyla gönderildi! ───');
+      if (response.statusCode == 200) {
+        var data = jsonDecode(response.body);
+        _sessionId = data['sessionId'];
+        _addLog('[BAŞARILI] API Session ID: $_sessionId');
+        
+        _startPolling();
+      } else {
+        _status = SendingStatus.idle;
+        _addLog('[HATA] API reddetti: ${response.body}');
+        notifyListeners();
+      }
+    } catch (e) {
+      _status = SendingStatus.idle;
+      _addLog('[HATA] Backend bağlantısı kurulamadı: $e');
       notifyListeners();
     }
   }
 
-  /// Gönderimi durdur
-  void stopSending() {
-    if (_status != SendingStatus.sending) return;
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (_sessionId == null) return;
 
-    _sendTimer?.cancel();
-    _sendTimer = null;
-    _status = SendingStatus.paused;
-    _addLog('[DURDURULDU] Gönderim kullanıcı tarafından durduruldu. '
-        '($_sentCount / ${_phoneNumbers.length})');
-    notifyListeners();
+      try {
+        var response = await http.get(Uri.parse('$_baseUrl/status/$_sessionId'));
+        
+        if (response.statusCode == 200) {
+          var data = jsonDecode(utf8.decode(response.bodyBytes)); 
+          
+          _sentCount = data['sentCount'] ?? 0;
+          _progress = data['progress'] ?? 0.0;
+          
+          List<dynamic> backendLogs = data['logs'] ?? [];
+          if (backendLogs.length > _logs.length) {
+            _logs = backendLogs.map((e) => e.toString()).toList();
+            _scrollToBottom();
+          }
+
+          String currentStatus = data['status'];
+          
+          if (currentStatus == 'COMPLETED') {
+            _status = SendingStatus.completed;
+            _pollingTimer?.cancel();
+            _addLog('─── Tüm mesajlar başarıyla gönderildi! ───');
+          } else if (currentStatus == 'FAILED') {
+            _status = SendingStatus.idle;
+            _pollingTimer?.cancel();
+            _addLog('─── GÖNDERİM ÇÖKTÜ VEYA İPTAL OLDU ───');
+          }
+          
+          notifyListeners();
+        }
+      } catch (e) {
+        print("Polling hatası: $e");
+      }
+    });
   }
 
-  /// Sıfırla
+  Future<void> stopSending() async {
+    if (_status != SendingStatus.sending || _sessionId == null) return;
+
+    try {
+      var response = await http.post(Uri.parse('$_baseUrl/stop/$_sessionId'));
+      if (response.statusCode == 200) {
+        _pollingTimer?.cancel();
+        _status = SendingStatus.paused;
+        _addLog('[DURDURULDU] Gönderim kullanıcı tarafından durduruldu.');
+        notifyListeners();
+      }
+    } catch (e) {
+      _addLog('[HATA] Durdurma isteği başarısız: $e');
+    }
+  }
+
   void resetState() {
-    _sendTimer?.cancel();
-    _sendTimer = null;
+    _pollingTimer?.cancel();
     _status = SendingStatus.idle;
     _sentCount = 0;
+    _progress = 0.0;
+    _sessionId = null;
     _logs.clear();
     _attachedMedia.clear();
     notifyListeners();
   }
 
-  /// Log satırı ekle
   void _addLog(String message) {
-    final timestamp = _formatTime(DateTime.now());
+    final timestamp = '${DateTime.now().hour.toString().padLeft(2, '0')}:'
+        '${DateTime.now().minute.toString().padLeft(2, '0')}:'
+        '${DateTime.now().second.toString().padLeft(2, '0')}';
     _logs.add('[$timestamp] $message');
+    _scrollToBottom();
+  }
 
-    // Log ekranını aşağı kaydır
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (logScrollController.hasClients) {
         logScrollController.animateTo(
@@ -246,12 +290,6 @@ class MessageProvider extends ChangeNotifier {
     });
   }
 
-  String _formatTime(DateTime dt) {
-    return '${dt.hour.toString().padLeft(2, '0')}:'
-        '${dt.minute.toString().padLeft(2, '0')}:'
-        '${dt.second.toString().padLeft(2, '0')}';
-  }
-
   @override
   void dispose() {
     phoneController.dispose();
@@ -259,7 +297,7 @@ class MessageProvider extends ChangeNotifier {
     minDelayController.dispose();
     maxDelayController.dispose();
     logScrollController.dispose();
-    _sendTimer?.cancel();
+    _pollingTimer?.cancel();
     super.dispose();
   }
 }
