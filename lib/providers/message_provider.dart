@@ -34,7 +34,7 @@ class MessageProvider extends ChangeNotifier {
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'mp4', 'avi', 'mov', 'mkv', 'webm'],
         allowMultiple: true,
-        withData: kIsWeb,
+        withData: true, // Her platformda byte verisini zorunlu al
       );
 
       if (result != null && result.files.isNotEmpty) {
@@ -175,29 +175,33 @@ class MessageProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/start'));
-      
-      request.fields['phoneNumbers'] = jsonEncode(_phoneNumbers);
-      request.fields['message'] = messageController.text.trim();
-      request.fields['minDelay'] = minDelay.toString();
-      request.fields['maxDelay'] = maxDelay.toString();
+      // 1. JSON İsteğinin Gövdesini Hazırla
+      Map<String, dynamic> requestBody = {
+        'phoneNumbers': _phoneNumbers,
+        'message': messageController.text.trim(),
+        'minDelay': minDelay,
+        'maxDelay': maxDelay,
+        'media': [],
+      };
 
-      // MEDYA DOSYALARINI API'YE EKLEME KISMI
+      // 2. Varsa Medya Dosyalarını Base64 String'e Çevir
       if (hasMedia) {
         for (var file in _attachedMedia) {
-          // Masaüstü uygulaması olduğu için file.path doludur
-          if (file.path != null) {
-            request.files.add(await http.MultipartFile.fromPath(
-              'media', // Spring Boot'taki @RequestParam adıyla BİREBİR aynı olmalı
-              file.path!,
-              filename: file.name,
-            ));
+          if (file.bytes != null) {
+            requestBody['media'].add({
+              'fileName': file.name,
+              'base64Data': base64Encode(file.bytes!), // Dart'ın yerleşik base64Encode fonksiyonu
+            });
           }
         }
       }
 
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+      // 3. Normal HTTP POST İsteği At (Multipart YERİNE JSON)
+      var response = await http.post(
+        Uri.parse('$_baseUrl/start'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
 
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
