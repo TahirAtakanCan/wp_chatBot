@@ -29,23 +29,19 @@ class MessageContentPanel extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                // Medya ekle butonu
                 FilledButton.tonalIcon(
                   onPressed: provider.pickMedia,
                   icon: const Icon(Icons.attach_file, size: 18),
                   label: const Text('Medya Ekle'),
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     textStyle: const TextStyle(fontSize: 13),
                   ),
                 ),
                 if (provider.hasMedia) ...[
                   const SizedBox(width: 8),
-                  // Medya sayacı rozeti
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.secondaryContainer,
                       borderRadius: BorderRadius.circular(20),
@@ -53,8 +49,7 @@ class MessageContentPanel extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.perm_media, size: 14,
-                            color: theme.colorScheme.onSecondaryContainer),
+                        Icon(Icons.perm_media, size: 14, color: theme.colorScheme.onSecondaryContainer),
                         const SizedBox(width: 4),
                         Text(
                           '${provider.mediaCount} dosya',
@@ -68,7 +63,6 @@ class MessageContentPanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  // Tümünü temizle
                   IconButton(
                     onPressed: provider.clearAllMedia,
                     icon: const Icon(Icons.clear_all, size: 20),
@@ -79,72 +73,82 @@ class MessageContentPanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            // Mesaj yazma alanı
             Expanded(
-              child: TextField(
-                controller: provider.messageController,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: const InputDecoration(
-                  hintText: 'Gönderilecek mesajı buraya yazın...',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
-                ),
-                style: const TextStyle(fontSize: 14, height: 1.5),
-              ),
-            ),
-            // Eklenen medya önizlemeleri
-            if (provider.hasMedia) ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.colorScheme.outlineVariant,
-                  ),
-                ),
+              child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Ekli Medya Dosyaları',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
+                    // Mesaj yazma alanı
                     SizedBox(
-                      height: 80,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: provider.attachedMedia.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final file = provider.attachedMedia[index];
-                          return _MediaThumbnail(
-                            file: file,
-                            isImage: provider.isImageFile(file),
-                            fileSize: provider.formatFileSize(file.size),
-                            onRemove: () => provider.removeMedia(index),
-                          );
-                        },
+                      height: 120,
+                      child: TextField(
+                        controller: provider.messageController,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        decoration: const InputDecoration(
+                          hintText: 'Gönderilecek mesajı buraya yazın...',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        style: const TextStyle(fontSize: 14, height: 1.5),
                       ),
                     ),
+                    // Eklenen medya önizlemeleri
+                    if (provider.hasMedia) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ekli Medya Dosyaları',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              height: 80,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: provider.attachedMedia.length,
+                                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  final file = provider.attachedMedia[index];
+                                  return _MediaThumbnail(
+                                    file: file,
+                                    isImage: provider.isImageFile(file),
+                                    fileSize: provider.formatFileSize(file.size),
+                                    onRemove: () => provider.removeMedia(index),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
+            // ...existing code...
   }
 }
 

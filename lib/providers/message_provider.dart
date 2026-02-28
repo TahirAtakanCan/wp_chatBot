@@ -182,6 +182,20 @@ class MessageProvider extends ChangeNotifier {
       request.fields['minDelay'] = minDelay.toString();
       request.fields['maxDelay'] = maxDelay.toString();
 
+      // MEDYA DOSYALARINI API'YE EKLEME KISMI
+      if (hasMedia) {
+        for (var file in _attachedMedia) {
+          // Masaüstü uygulaması olduğu için file.path doludur
+          if (file.path != null) {
+            request.files.add(await http.MultipartFile.fromPath(
+              'media', // Spring Boot'taki @RequestParam adıyla BİREBİR aynı olmalı
+              file.path!,
+              filename: file.name,
+            ));
+          }
+        }
+      }
+
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
