@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/message_provider.dart';
 import '../models/sending_state.dart';
@@ -58,6 +59,29 @@ class ProgressLogPanel extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(width: 8),
+                // Logları kopyala butonu
+                if (provider.logs.isNotEmpty)
+                  IconButton(
+                    icon: Icon(Icons.copy_rounded, size: 18,
+                        color: theme.colorScheme.onSurfaceVariant),
+                    tooltip: 'Tüm logları kopyala',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      final allLogs = provider.logs.join('\n');
+                      Clipboard.setData(ClipboardData(text: allLogs));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Loglar panoya kopyalandı'),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 const Spacer(),
                 // Durum etiketi
                 Container(
@@ -158,7 +182,7 @@ class ProgressLogPanel extends StatelessWidget {
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 2),
-                            child: Text(
+                            child: SelectableText(
                               log,
                               style: TextStyle(
                                 color: logColor,

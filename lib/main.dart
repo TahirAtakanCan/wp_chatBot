@@ -21,9 +21,22 @@ class MainApp extends StatelessWidget {
           colorSchemeSeed: const Color(0xFF1B5E20),
           brightness: Brightness.light,
           useMaterial3: true,
-          inputDecorationTheme: const InputDecorationTheme(
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          cardTheme: CardThemeData(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          appBarTheme: const AppBarTheme(
+            surfaceTintColor: Colors.transparent,
           ),
         ),
         home: const HomeScreen(),

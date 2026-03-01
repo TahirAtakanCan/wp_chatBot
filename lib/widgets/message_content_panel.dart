@@ -1,9 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/message_provider.dart';
 
-class MessageContentPanel extends StatelessWidget {
+class MessageContentPanel extends StatefulWidget {
   const MessageContentPanel({super.key});
+
+  @override
+  State<MessageContentPanel> createState() => _MessageContentPanelState();
+}
+
+class _MessageContentPanelState extends State<MessageContentPanel> {
+  late final FocusNode _messageFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageFocusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.enter &&
+            HardwareKeyboard.instance.isShiftPressed) {
+          _insertSeparator();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+    );
+  }
+
+  void _insertSeparator() {
+    final provider = context.read<MessageProvider>();
+    final controller = provider.messageController;
+    final sel = controller.selection;
+
+    if (!sel.isValid) return;
+
+    const sep = '\n✂ ── Mesaj Ayrımı ──\n';
+    final text = controller.text;
+    final before = text.substring(0, sel.start);
+    final after = text.substring(sel.end);
+
+    controller.value = TextEditingValue(
+      text: '$before$sep$after',
+      selection: TextSelection.collapsed(offset: sel.start + sep.length),
+    );
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _messageFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +78,33 @@ class MessageContentPanel extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
+                // Mesaj ayrımı sayısı badge
+                if (provider.messagePartCount > 1) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.content_cut, size: 13,
+                            color: theme.colorScheme.onTertiaryContainer),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${provider.messagePartCount} mesaj',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onTertiaryContainer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 FilledButton.tonalIcon(
                   onPressed: provider.pickMedia,
                   icon: const Icon(Icons.attach_file, size: 18),
@@ -83,15 +159,70 @@ class MessageContentPanel extends StatelessWidget {
                       height: 120,
                       child: TextField(
                         controller: provider.messageController,
+                        focusNode: _messageFocusNode,
                         maxLines: null,
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
+                        onChanged: (_) => setState(() {}),
                         decoration: const InputDecoration(
-                          hintText: 'Gönderilecek mesajı buraya yazın...',
+                          hintText: 'Gönderilecek mesajı buraya yazın...\n\nShift+Enter ile ayrı mesajlara bölebilirsiniz',
+                          hintMaxLines: 3,
                           alignLabelWithHint: true,
                           border: OutlineInputBorder(),
                         ),
                         style: const TextStyle(fontSize: 14, height: 1.5),
+                      ),
+                    ),
+                    // Mesaj ayırma butonu
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        children: [
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: _insertSeparator,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.content_cut,
+                                      size: 14,
+                                      color: theme.colorScheme.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Mesaj Ayır',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: theme
+                                          .colorScheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Shift+Enter',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: theme
+                                            .colorScheme.onSurfaceVariant,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     // Eklenen medya önizlemeleri

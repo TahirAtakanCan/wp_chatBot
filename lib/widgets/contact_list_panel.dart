@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/message_provider.dart';
+import '../utils/phone_formatter.dart';
 
 class ContactListPanel extends StatelessWidget {
   const ContactListPanel({super.key});
@@ -75,9 +76,10 @@ class ContactListPanel extends StatelessWidget {
                 expands: true,
                 textAlignVertical: TextAlignVertical.top,
                 onChanged: (_) => provider.parsePhoneNumbers(),
+                inputFormatters: [PhoneNumberFormatter()],
                 decoration: const InputDecoration(
                   hintText:
-                      'Telefon numaralarını alt alta yazın...\n\n5551234567\n5559876543\n5553214567',
+                      'Telefon numaralarını alt alta yazın...\n\n(555) 123 4567\n(555) 987 6543\n(555) 321 4567',
                   hintMaxLines: 6,
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(),

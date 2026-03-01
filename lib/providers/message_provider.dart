@@ -21,6 +21,26 @@ class MessageProvider extends ChangeNotifier {
   // --- Mesaj İçeriği ---
   final TextEditingController messageController = TextEditingController();
 
+  /// Mesaj ayırma işareti
+  static const String messageSplitMarker = '✂ ── Mesaj Ayrımı ──';
+
+  /// Mesajı Shift+Enter ile ayrılmış parçalara böler
+  List<String> get splitMessages {
+    final text = messageController.text.trim();
+    if (text.isEmpty) return [];
+    return text
+        .split(messageSplitMarker)
+        .map((m) => m.trim())
+        .where((m) => m.isNotEmpty)
+        .toList();
+  }
+
+  /// Kaç ayrı mesaj parçası olduğu
+  int get messagePartCount {
+    final parts = splitMessages;
+    return parts.isEmpty ? 0 : parts.length;
+  }
+
   // --- Medya Ekleri ---
   final List<PlatformFile> _attachedMedia = [];
   List<PlatformFile> get attachedMedia => List.unmodifiable(_attachedMedia);
@@ -162,8 +182,9 @@ class MessageProvider extends ChangeNotifier {
       _addLog('[HATA] Gönderilecek telefon numarası bulunamadı.');
       return;
     }
-    if (messageController.text.trim().isEmpty) {
-      _addLog('[HATA] Mesaj içeriği boş olamaz.');
+    // Metin boşsa, medya yoksa hata ver. Medya varsa gönderime izin ver.
+    if (messageController.text.trim().isEmpty && !hasMedia) {
+      _addLog('[HATA] Lütfen bir mesaj metni veya medya (resim/video) ekleyin.');
       return;
     }
 
@@ -176,9 +197,11 @@ class MessageProvider extends ChangeNotifier {
 
     try {
       // 1. JSON İsteğinin Gövdesini Hazırla
+      final messages = splitMessages;
       Map<String, dynamic> requestBody = {
         'phoneNumbers': _phoneNumbers,
         'message': messageController.text.trim(),
+        'messages': messages,
         'minDelay': minDelay,
         'maxDelay': maxDelay,
         'media': [],
