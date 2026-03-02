@@ -197,11 +197,12 @@ class MessageProvider extends ChangeNotifier {
 
     try {
       // 1. JSON İsteğinin Gövdesini Hazırla
-      final messages = splitMessages;
+        // Separator içeren mesajları filtrele
+        final messages = splitMessages.where((m) => m != messageSplitMarker && m.trim().isNotEmpty).toList();
       Map<String, dynamic> requestBody = {
         'phoneNumbers': _phoneNumbers,
         'message': messageController.text.trim(),
-        'messages': messages,
+          'messages': messages,
         'minDelay': minDelay,
         'maxDelay': maxDelay,
         'media': [],
