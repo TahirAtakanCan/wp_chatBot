@@ -48,6 +48,70 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
     setState(() {});
   }
 
+  void _showServerMediaDialog(BuildContext context, MessageProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Sunucudaki Medyalar'),
+          content: SizedBox(
+            width: 400,
+            height: 400,
+            child: FutureBuilder<List<String>>(
+              future: provider.fetchAvailableMedia(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'Sunucuda hiç resim bulunamadı.\n(Önce uploads klasörüne resim atın)',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: snapshot.data!.length,
+                  itemBuilder: (context, index) {
+                    final url = snapshot.data![index];
+                    return InkWell(
+                      onTap: () {
+                        provider.addMediaUrl(url);
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(url, fit: BoxFit.cover),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Kapat'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _messageFocusNode.dispose();
@@ -106,7 +170,7 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                   const SizedBox(width: 8),
                 ],
                 FilledButton.tonalIcon(
-                  onPressed: provider.pickMedia,
+                  onPressed: () => _showServerMediaDialog(context, provider),
                   icon: const Icon(Icons.attach_file, size: 18),
                   label: const Text('Medya Ekle'),
                   style: FilledButton.styleFrom(
@@ -250,22 +314,24 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            SizedBox(
-                              height: 80,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: provider.attachedMedia.length,
-                                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                                itemBuilder: (context, index) {
-                                  final file = provider.attachedMedia[index];
-                                  return _MediaThumbnail(
-                                    file: file,
-                                    isImage: provider.isImageFile(file),
-                                    fileSize: provider.formatFileSize(file.size),
-                                    onRemove: () => provider.removeMedia(index),
-                                  );
-                                },
-                              ),
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: provider.attachedMedia.length,
+                              itemBuilder: (context, index) {
+                                final url = provider.attachedMedia[index];
+                                final fileName = url.split('/').last;
+
+                                return ListTile(
+                                  leading: Image.network(url, width: 40, height: 40, fit: BoxFit.cover),
+                                  title: Text(fileName),
+                                  subtitle: const Text('Sunucudan eklendi'),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => provider.removeMedia(index),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -283,85 +349,3 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
   }
 }
 
-class _MediaThumbnail extends StatelessWidget {
-  final dynamic file;
-  final bool isImage;
-  final String fileSize;
-  final VoidCallback onRemove;
-
-  const _MediaThumbnail({
-    required this.file,
-    required this.isImage,
-    required this.fileSize,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Stack(
-      children: [
-        Container(
-          width: 100,
-          height: 80,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isImage ? Icons.image : Icons.videocam,
-                size: 28,
-                color: isImage
-                    ? Colors.blue.shade400
-                    : Colors.purple.shade400,
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  file.name,
-                  style: const TextStyle(fontSize: 10),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-              Text(
-                fileSize,
-                style: TextStyle(
-                  fontSize: 9,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Kaldır butonu
-        Positioned(
-          top: -4,
-          right: -4,
-          child: GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: Colors.red.shade600,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.close,
-                size: 13,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
