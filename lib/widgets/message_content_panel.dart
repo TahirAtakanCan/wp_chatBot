@@ -124,228 +124,354 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
     final theme = Theme.of(context);
 
     return Card(
-      elevation: 1,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(14.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Başlık satırı
+            // ── Başlık ──
             Row(
               children: [
-                Icon(Icons.message, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.chat_bubble_outline_rounded,
+                      size: 18, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: 10),
                 Text(
                   'Mesaj İçeriği',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const Spacer(),
-                // Mesaj ayrımı sayısı badge
                 if (provider.messagePartCount > 1) ...[
+                  const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.tertiaryContainer,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.content_cut, size: 13,
-                            color: theme.colorScheme.onTertiaryContainer),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${provider.messagePartCount} mesaj',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onTertiaryContainer,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      '${provider.messagePartCount} parça',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onTertiaryContainer,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                FilledButton.tonalIcon(
-                  onPressed: () => _showServerMediaDialog(context, provider),
-                  icon: const Icon(Icons.attach_file, size: 18),
-                  label: const Text('Medya Ekle'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    textStyle: const TextStyle(fontSize: 13),
-                  ),
-                ),
-                if (provider.hasMedia) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.perm_media, size: 14, color: theme.colorScheme.onSecondaryContainer),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${provider.mediaCount} dosya',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onSecondaryContainer,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    onPressed: provider.clearAllMedia,
-                    icon: const Icon(Icons.clear_all, size: 20),
-                    tooltip: 'Tüm medyayı kaldır',
-                    visualDensity: VisualDensity.compact,
                   ),
                 ],
               ],
             ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Mesaj yazma alanı
-                    SizedBox(
-                      height: 120,
-                      child: TextField(
-                        controller: provider.messageController,
-                        focusNode: _messageFocusNode,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          hintText: 'Gönderilecek mesajı buraya yazın...\n\nShift+Enter ile ayrı mesajlara bölebilirsiniz',
-                          hintMaxLines: 3,
-                          alignLabelWithHint: true,
-                          border: OutlineInputBorder(),
-                        ),
-                        style: const TextStyle(fontSize: 14, height: 1.5),
-                      ),
-                    ),
-                    // Mesaj ayırma butonu
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Row(
-                        children: [
-                          InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: _insertSeparator,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.content_cut,
-                                      size: 14,
-                                      color: theme.colorScheme.primary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Mesaj Ayır',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: theme.colorScheme.primary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: theme
-                                          .colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'Shift+Enter',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: theme
-                                            .colorScheme.onSurfaceVariant,
-                                        fontFamily: 'monospace',
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Eklenen medya önizlemeleri
-                    if (provider.hasMedia) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: theme.colorScheme.outlineVariant,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ekli Medya Dosyaları',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: provider.attachedMedia.length,
-                              itemBuilder: (context, index) {
-                                final url = provider.attachedMedia[index];
-                                final fileName = url.split('/').last;
+            const SizedBox(height: 12),
 
-                                return ListTile(
-                                  leading: Image.network(url, width: 40, height: 40, fit: BoxFit.cover),
-                                  title: Text(fileName),
-                                  subtitle: const Text('Sunucudan eklendi'),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () => provider.removeMedia(index),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
+            // ── Mesaj Yazma Alanı ──
+            Expanded(
+              child: TextField(
+                controller: provider.messageController,
+                focusNode: _messageFocusNode,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Mesajınızı yazın...',
+                  hintStyle: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerLowest,
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
                 ),
+                style: const TextStyle(fontSize: 14, height: 1.6),
               ),
             ),
+            const SizedBox(height: 8),
+
+            // ── Araç Çubuğu ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  // Mesaj Ayır
+                  _ToolbarButton(
+                    icon: Icons.content_cut_rounded,
+                    label: 'Mesaj Ayır',
+                    shortcut: '⇧ Enter',
+                    onTap: _insertSeparator,
+                    theme: theme,
+                  ),
+                  Container(
+                    width: 1,
+                    height: 20,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                  // Medya Ekle
+                  _ToolbarButton(
+                    icon: Icons.add_photo_alternate_outlined,
+                    label: 'Medya Ekle',
+                    onTap: () => _showServerMediaDialog(context, provider),
+                    theme: theme,
+                    badge: provider.hasMedia ? provider.mediaCount : null,
+                  ),
+                  const Spacer(),
+                  // Tümünü temizle
+                  if (provider.hasMedia)
+                    TextButton.icon(
+                      onPressed: provider.clearAllMedia,
+                      icon: Icon(Icons.delete_sweep_outlined,
+                          size: 16, color: theme.colorScheme.error),
+                      label: Text(
+                        'Tümünü Kaldır',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // ── Eklenen Medyalar ──
+            if (provider.hasMedia) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 72,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: provider.attachedMedia.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final url = provider.attachedMedia[index];
+                    final fileName = url.split('/').last;
+                    return _MediaChip(
+                      url: url,
+                      fileName: fileName,
+                      onRemove: () => provider.removeMedia(index),
+                      theme: theme,
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
-            // ...existing code...
+  }
+}
+
+// ── Araç Çubuğu Butonu ──
+class _ToolbarButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? shortcut;
+  final VoidCallback onTap;
+  final ThemeData theme;
+  final int? badge;
+
+  const _ToolbarButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.theme,
+    this.shortcut,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: theme.colorScheme.primary),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              if (badge != null) ...[
+                const SizedBox(width: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$badge',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+              if (shortcut != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Text(
+                    shortcut!,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Medya Chip ──
+class _MediaChip extends StatelessWidget {
+  final String url;
+  final String fileName;
+  final VoidCallback onRemove;
+  final ThemeData theme;
+
+  const _MediaChip({
+    required this.url,
+    required this.fileName,
+    required this.onRemove,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 160,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          // Thumbnail
+          ClipRRect(
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
+            child: Image.network(
+              url,
+              width: 56,
+              height: 72,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 56,
+                height: 72,
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Icon(Icons.broken_image_outlined,
+                    size: 22, color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ),
+          // Info + delete
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    fileName,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Sunucu',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Delete button
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onRemove,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.close_rounded,
+                    size: 14, color: theme.colorScheme.error),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
