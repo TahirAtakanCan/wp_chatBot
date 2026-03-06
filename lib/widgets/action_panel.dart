@@ -10,6 +10,7 @@ class ActionPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<MessageProvider>();
     final isSending = provider.status == SendingStatus.sending;
+    final isPaused = provider.status == SendingStatus.paused;
 
     return Card(
       elevation: 1,
@@ -20,7 +21,7 @@ class ActionPanel extends StatelessWidget {
             // Başlat butonu
             Expanded(
               child: FilledButton.icon(
-                onPressed: isSending ? null : provider.startSending,
+                onPressed: isSending || isPaused ? null : provider.startSending,
                 icon: const Icon(Icons.play_arrow_rounded, size: 22),
                 label: const Text(
                   'Gönderimi Başlat',
@@ -37,24 +38,40 @@ class ActionPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Durdur butonu
+            // Durdur / Devam Et butonu
             Expanded(
-              child: FilledButton.icon(
-                onPressed: isSending ? provider.stopSending : null,
-                icon: const Icon(Icons.stop_rounded, size: 22),
-                label: const Text(
-                  'Gönderimi Durdur',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red.shade700,
-                  disabledBackgroundColor: Colors.red.shade200,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
+              child: isPaused
+                  ? FilledButton.icon(
+                      onPressed: provider.resumeSending,
+                      icon: const Icon(Icons.play_circle_outline_rounded, size: 22),
+                      label: const Text(
+                        'Kaldığı Yerden Devam',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.orange.shade700,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    )
+                  : FilledButton.icon(
+                      onPressed: isSending ? provider.stopSending : null,
+                      icon: const Icon(Icons.stop_rounded, size: 22),
+                      label: const Text(
+                        'Gönderimi Durdur',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        disabledBackgroundColor: Colors.red.shade200,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(width: 12),
             // Sıfırla butonu

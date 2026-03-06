@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:excel/excel.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sending_state.dart';
 
 class MessageProvider extends ChangeNotifier {
@@ -16,6 +19,10 @@ class MessageProvider extends ChangeNotifier {
   List<String> _phoneNumbers = [];
   List<String> get phoneNumbers => _phoneNumbers;
   int get phoneCount => _phoneNumbers.length;
+
+  // --- Dosya Devam (Resume) Sistemi ---
+  String? _lastLoadedFileName;
+  List<String> _originalFileNumbers = [];
 
   // --- Mesaj İçeriği ---
   final TextEditingController messageController = TextEditingController();
@@ -83,9 +90,95 @@ class MessageProvider extends ChangeNotifier {
   }
 
   // Yardımcı metodlar
-  void loadFromFile() {
-    _addLog('[BİLGİ] Dosyadan yükleme özelliği henüz aktif değil.');
-    notifyListeners();
+  Future<void> loadFromFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['txt', 'xlsx', 'xls', 'csv'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        _addLog('[BİLGİ] Dosya seçimi iptal edildi.');
+        return;
+      }
+
+      final file = result.files.first;
+      final extension = file.extension?.toLowerCase() ?? '';
+      List<String> numbers = [];
+
+      if (extension == 'txt' || extension == 'csv') {
+        final bytes = file.bytes;
+        if (bytes == null) {
+          _addLog('[HATA] Dosya okunamadı.');
+          return;
+        }
+        final content = utf8.decode(bytes);
+        numbers = content
+            .split(RegExp(r'[\n,;\r]+'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      } else if (extension == 'xlsx' || extension == 'xls') {
+        final bytes = file.bytes;
+        if (bytes == null) {
+          _addLog('[HATA] Dosya okunamadı.');
+          return;
+        }
+        final excel = Excel.decodeBytes(bytes);
+        for (var table in excel.tables.keys) {
+          final sheet = excel.tables[table]!;
+          for (var row in sheet.rows) {
+            for (var cell in row) {
+              if (cell != null && cell.value != null) {
+                final val = cell.value.toString().trim();
+                if (val.isNotEmpty && RegExp(r'\d').hasMatch(val)) {
+                  numbers.add(val);
+                }
+              }
+            }
+          }
+        }
+      } else {
+        _addLog('[HATA] Desteklenmeyen dosya formatı: .$extension');
+        return;
+      }
+
+      if (numbers.isEmpty) {
+        _addLog('[UYARI] Dosyada numara bulunamadı.');
+        return;
+      }
+
+      // Devam durumunu kontrol et
+      final resumeState = await _getResumeState(file.name);
+      final totalCount = numbers.length;
+
+      if (resumeState != null) {
+        final alreadySent = resumeState['sentCount'] as int;
+        if (alreadySent > 0 && alreadySent < numbers.length) {
+          numbers = numbers.sublist(alreadySent);
+          _addLog('[DEVAM] "${file.name}" dosyasında $alreadySent/$totalCount numara daha önce gönderilmiş.');
+          _addLog('[DEVAM] Kalan ${numbers.length} numaradan devam ediliyor.');
+        } else if (alreadySent >= numbers.length) {
+          _addLog('[BİLGİ] "${file.name}" dosyasındaki tüm numaralar zaten gönderilmiş. Liste sıfırdan yükleniyor.');
+          await _clearResumeState();
+        }
+      }
+
+      _lastLoadedFileName = file.name;
+      _originalFileNumbers = List.from(numbers);
+
+      // Mevcut numaralara ekle
+      final existing = phoneController.text.trim();
+      final newContent = numbers.join('\n');
+      phoneController.text = existing.isEmpty ? newContent : '$existing\n$newContent';
+      parsePhoneNumbers();
+      _addLog('[BAŞARILI] ${numbers.length} numara dosyadan yüklendi (${file.name}).');
+      notifyListeners();
+    } catch (e) {
+      _addLog('[HATA] Dosya okunurken hata: $e');
+      notifyListeners();
+    }
   }
 
   bool isImageUrl(String url) {
@@ -207,7 +300,12 @@ class MessageProvider extends ChangeNotifier {
   }
 
   void _startPolling() {
+    _startPollingWithOffset(0);
+  }
+
+  void _startPollingWithOffset(int sentOffset) {
     _pollingTimer?.cancel();
+    int _lastBackendLogCount = 0;
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_sessionId == null) return;
 
@@ -215,12 +313,21 @@ class MessageProvider extends ChangeNotifier {
         var response = await http.get(Uri.parse('$_baseUrl/status/$_sessionId'));
         if (response.statusCode == 200) {
           var data = jsonDecode(utf8.decode(response.bodyBytes)); 
-          _sentCount = data['sentCount'] ?? 0;
-          _progress = data['progress'] ?? 0.0;
+          final newSentCount = (data['sentCount'] ?? 0) + sentOffset;
+          if (newSentCount != _sentCount) {
+            _sentCount = newSentCount;
+            _saveResumeState();
+          }
+          _progress = _phoneNumbers.isNotEmpty
+              ? _sentCount / _phoneNumbers.length
+              : (data['progress'] ?? 0.0);
           
           List<dynamic> backendLogs = data['logs'] ?? [];
-          if (backendLogs.length > _logs.length) {
-            _logs = backendLogs.map((e) => e.toString()).toList();
+          if (backendLogs.length > _lastBackendLogCount) {
+            for (int i = _lastBackendLogCount; i < backendLogs.length; i++) {
+              _logs.add(backendLogs[i].toString());
+            }
+            _lastBackendLogCount = backendLogs.length;
             _scrollToBottom();
           }
 
@@ -228,6 +335,7 @@ class MessageProvider extends ChangeNotifier {
           if (currentStatus == 'COMPLETED') {
             _status = SendingStatus.completed;
             _pollingTimer?.cancel();
+            _clearResumeState();
             _addLog('─── Tüm işlemler tamamlandı ───');
           } else if (currentStatus == 'FAILED') {
             _status = SendingStatus.idle;
@@ -249,11 +357,83 @@ class MessageProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         _pollingTimer?.cancel();
         _status = SendingStatus.paused;
-        _addLog('[DURDURULDU] İşlem kullanıcı tarafından durduruldu.');
+        _saveResumeState();
+        _addLog('[DURDURULDU] İşlem kullanıcı tarafından durduruldu. Kaldığınız yerden devam edebilirsiniz.');
         notifyListeners();
       }
     } catch (e) {
       _addLog('[HATA] Durdurma isteği başarısız: $e');
+    }
+  }
+
+  Future<void> resumeSending() async {
+    if (_status != SendingStatus.paused) return;
+
+    parsePhoneNumbers();
+
+    if (_phoneNumbers.isEmpty) {
+      _addLog('[HATA] Devam edilecek telefon numarası bulunamadı.');
+      return;
+    }
+
+    // Daha önce gönderilenleri atla
+    final remaining = _phoneNumbers.sublist(_sentCount);
+    if (remaining.isEmpty) {
+      _addLog('[BİLGİ] Gönderilecek numara kalmadı.');
+      _status = SendingStatus.completed;
+      _clearResumeState();
+      notifyListeners();
+      return;
+    }
+
+    _status = SendingStatus.sending;
+    _addLog('─── Gönderim kaldığı yerden devam ediyor ($_sentCount/${_phoneNumbers.length}) ───');
+    notifyListeners();
+
+    try {
+      final messages = splitMessages.where((m) => m != messageSplitMarker && m.trim().isNotEmpty).toList();
+
+      Map<String, dynamic> requestBody = {
+        'phoneNumbers': remaining,
+        'message': messageController.text.trim(),
+        'messages': messages,
+        'minDelay': minDelay,
+        'maxDelay': maxDelay,
+        'media': [],
+      };
+
+      if (hasMedia) {
+        for (var url in _selectedMediaUrls) {
+          requestBody['media'].add({
+            'url': url,
+            'type': 'image',
+            'fileName': url.split('/').last,
+          });
+        }
+      }
+
+      final previousSent = _sentCount;
+
+      var response = await http.post(
+        Uri.parse('$_baseUrl/start'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        var data = jsonDecode(response.body);
+        _sessionId = data['sessionId'];
+        _addLog('[BAŞARILI] Devam ediliyor - API Session ID: $_sessionId');
+        _startPollingWithOffset(previousSent);
+      } else {
+        _status = SendingStatus.paused;
+        _addLog('[HATA] API reddetti: ${response.body}');
+        notifyListeners();
+      }
+    } catch (e) {
+      _status = SendingStatus.paused;
+      _addLog('[HATA] Backend bağlantısı kurulamadı: $e');
+      notifyListeners();
     }
   }
 
@@ -265,7 +445,49 @@ class MessageProvider extends ChangeNotifier {
     _sessionId = null;
     _logs.clear();
     _selectedMediaUrls.clear();
+    _lastLoadedFileName = null;
+    _originalFileNumbers.clear();
     notifyListeners();
+  }
+
+  // ==========================================
+  // DEVAM (RESUME) SİSTEMİ
+  // ==========================================
+
+  Future<void> _saveResumeState() async {
+    if (_lastLoadedFileName == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final state = {
+        'fileName': _lastLoadedFileName,
+        'sentCount': _sentCount,
+        'messageHash': messageController.text.trim().hashCode,
+      };
+      await prefs.setString('resume_state', jsonEncode(state));
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>?> _getResumeState(String fileName) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stateJson = prefs.getString('resume_state');
+      if (stateJson == null) return null;
+      final state = jsonDecode(stateJson) as Map<String, dynamic>;
+      final currentMsgHash = messageController.text.trim().hashCode;
+      if (state['fileName'] == fileName && state['messageHash'] == currentMsgHash) {
+        return state;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _clearResumeState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('resume_state');
+    } catch (_) {}
+    _lastLoadedFileName = null;
+    _originalFileNumbers.clear();
   }
 
   void _addLog(String message) {
