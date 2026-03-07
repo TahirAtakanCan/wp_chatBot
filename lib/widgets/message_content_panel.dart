@@ -215,7 +215,7 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
             ),
             const SizedBox(height: 8),
 
-            // ── Araç Çubuğu ──
+            // ── Araç Çubuğu + Medya (tek satır) ──
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               decoration: BoxDecoration(
@@ -238,59 +238,87 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
                   ),
-                  // Medya Ekle
+                  // Bilgisayardan Yükle
                   _ToolbarButton(
-                    icon: Icons.add_photo_alternate_outlined,
-                    label: 'Medya Ekle',
-                    onTap: () => _showServerMediaDialog(context, provider),
+                    icon: Icons.upload_file_rounded,
+                    label: 'Bilgisayardan Yükle',
+                    onTap: () => provider.uploadMediaFromDevice(),
                     theme: theme,
                     badge: provider.hasMedia ? provider.mediaCount : null,
                   ),
-                  const Spacer(),
-                  // Tümünü temizle
-                  if (provider.hasMedia)
-                    TextButton.icon(
-                      onPressed: provider.clearAllMedia,
-                      icon: Icon(Icons.delete_sweep_outlined,
-                          size: 16, color: theme.colorScheme.error),
-                      label: Text(
-                        'Tümünü Kaldır',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.error,
+                  // Eklenen medya dosya adları (kompakt chip'ler)
+                  if (provider.hasMedia) ...[
+                    Container(
+                      width: 1,
+                      height: 20,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                    Expanded(
+                      child: SizedBox(
+                        height: 28,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: provider.attachedMedia.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 4),
+                          itemBuilder: (context, index) {
+                            final url = provider.attachedMedia[index];
+                            final fileName = Uri.decodeComponent(url.split('/').last);
+                            final shortName = fileName.length > 18
+                                ? '${fileName.substring(0, 15)}...'
+                                : fileName;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.image_outlined, size: 13, color: theme.colorScheme.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    shortName,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: theme.colorScheme.onPrimaryContainer,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(10),
+                                    onTap: () => provider.removeMedia(index),
+                                    child: Icon(Icons.close_rounded,
+                                        size: 13, color: theme.colorScheme.error),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                  if (!provider.hasMedia) const Spacer(),
+                  // Tümünü temizle
+                  if (provider.hasMedia)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: provider.clearAllMedia,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        child: Icon(Icons.delete_sweep_outlined,
+                            size: 18, color: theme.colorScheme.error),
                       ),
                     ),
                 ],
               ),
             ),
-
-            // ── Eklenen Medyalar ──
-            if (provider.hasMedia) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 72,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: provider.attachedMedia.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final url = provider.attachedMedia[index];
-                    final fileName = url.split('/').last;
-                    return _MediaChip(
-                      url: url,
-                      fileName: fileName,
-                      onRemove: () => provider.removeMedia(index),
-                      theme: theme,
-                    );
-                  },
-                ),
-              ),
-            ],
           ],
         ),
       ),

@@ -66,6 +66,74 @@ class MessageProvider extends ChangeNotifier {
     return [];
   }
 
+  /// Bilgisayardan resim seçip sunucuya yükler, dönen URL'i listeye ekler
+  Future<bool> uploadMediaFromDevice() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        _addLog('[BİLGİ] Resim seçimi iptal edildi.');
+        return false;
+      }
+
+      final file = result.files.first;
+      if (file.bytes == null) {
+        _addLog('[HATA] Dosya okunamadı.');
+        return false;
+      }
+
+      _addLog('[YÜKLEME] "${file.name}" sunucuya yükleniyor...');
+      notifyListeners();
+
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$_mediaApiUrl/upload'),
+      );
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          file.bytes!,
+          filename: file.name,
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        String? url;
+
+        // Önce JSON olarak parse etmeyi dene
+        try {
+          final data = jsonDecode(response.body);
+          if (data is Map<String, dynamic>) {
+            url = data['url'] as String?;
+          }
+        } catch (_) {
+          // JSON değilse düz metin dönmüş demektir, URL'i dosya adından oluştur
+        }
+
+        // JSON'dan URL gelemediyse, dosya adından URL oluştur
+        url ??= '$_mediaApiUrl/uploads/${Uri.encodeComponent(file.name)}';
+
+        addMediaUrl(url);
+        _addLog('[BAŞARILI] "${file.name}" yüklendi → $url');
+        return true;
+      } else {
+        _addLog('[HATA] Yükleme başarısız (${response.statusCode}): ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      _addLog('[HATA] Dosya yüklenirken hata: $e');
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Kullanıcı arayüzden bir resim seçtiğinde listeye ekler
   void addMediaUrl(String url) {
     if (!_selectedMediaUrls.contains(url)) {
