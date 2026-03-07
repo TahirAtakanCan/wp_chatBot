@@ -106,23 +106,21 @@ class MessageProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         String? url;
-
-        // Önce JSON olarak parse etmeyi dene
         try {
           final data = jsonDecode(response.body);
           if (data is Map<String, dynamic>) {
             url = data['url'] as String?;
           }
-        } catch (_) {
-          // JSON değilse düz metin dönmüş demektir, URL'i dosya adından oluştur
+        } catch (_) {}
+
+        if (url != null) {
+          addMediaUrl(url);
+          _addLog('[BAŞARILI] "${file.name}" yüklendi → $url');
+          return true;
+        } else {
+          _addLog('[HATA] Resim sunucuya yüklendi ama geri dönen URL okunamadı.');
+          return false;
         }
-
-        // JSON'dan URL gelemediyse, dosya adından URL oluştur
-        url ??= '$_mediaApiUrl/uploads/${Uri.encodeComponent(file.name)}';
-
-        addMediaUrl(url);
-        _addLog('[BAŞARILI] "${file.name}" yüklendi → $url');
-        return true;
       } else {
         _addLog('[HATA] Yükleme başarısız (${response.statusCode}): ${response.body}');
         return false;
