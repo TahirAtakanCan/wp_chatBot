@@ -4,6 +4,7 @@ import '../widgets/message_content_panel.dart';
 import '../widgets/action_panel.dart';
 import '../widgets/progress_log_panel.dart';
 import '../widgets/anti_spam_drawer.dart';
+import '../widgets/whatsapp_qr_connector.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -71,6 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         scrolledUnderElevation: 1,
         actions: [
+          // WhatsApp bağlantı durumu
+          const WhatsappQrConnector(),
+          const SizedBox(width: 12),
           // Anti-Spam Ayarları butonu
           Tooltip(
             message: 'Anti-Spam Ayarları',
