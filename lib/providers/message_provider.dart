@@ -9,8 +9,8 @@ import '../models/sending_state.dart';
 
 class MessageProvider extends ChangeNotifier {
   // --- API Ayarları ---
-  final String _baseUrl = 'http://localhost:8080/api/send';
-  final String _mediaApiUrl = 'http://localhost:8080/api/media'; // Resimleri çekeceğimiz yeni API
+  final String _baseUrl = 'http://94.130.231.165:8080/api/send';
+  final String _mediaApiUrl = 'http://94.130.231.165:8080/api/media'; // Resimleri çekeceğimiz yeni API
   String? _sessionId;
   Timer? _pollingTimer;
 

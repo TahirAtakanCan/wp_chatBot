@@ -13,7 +13,7 @@ class WhatsappQrConnector extends StatefulWidget {
 }
 
 class _WhatsappQrConnectorState extends State<WhatsappQrConnector> {
-  static const String _baseUrl = 'http://localhost:8080';
+  static const String _baseUrl = 'http://94.130.231.165:8080';
 
   Timer? _timer;
   bool _connected = false;
