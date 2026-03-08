@@ -1,4 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/message_provider.dart';
+import '../screens/session_management_screen.dart';
+import '../services/session_service.dart';
 import '../widgets/contact_list_panel.dart';
 import '../widgets/message_content_panel.dart';
 import '../widgets/action_panel.dart';
@@ -15,6 +20,37 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Timer? _autoSelectTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _tryAutoSelectSession();
+  }
+
+  @override
+  void dispose() {
+    _autoSelectTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _tryAutoSelectSession() async {
+    final provider = context.read<MessageProvider>();
+    if (provider.activeSessionId != null) return;
+
+    final sessions = await SessionService.getAllSessions();
+    final connected = sessions.where((s) => s.connected).toList();
+
+    if (connected.isNotEmpty) {
+      provider.setActiveSession(connected.first.sessionId);
+    } else {
+      // Bağlı session yoksa 3 saniye sonra tekrar dene
+      _autoSelectTimer?.cancel();
+      _autoSelectTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) _tryAutoSelectSession();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +108,56 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         scrolledUnderElevation: 1,
         actions: [
+          // WhatsApp Hesap Yönetimi
+          Tooltip(
+            message: 'WhatsApp Hesapları',
+            child: IconButton.filledTonal(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SessionManagementScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.phone_android, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
           // WhatsApp bağlantı durumu
-          const WhatsappQrConnector(),
+          Consumer<MessageProvider>(
+            builder: (context, provider, _) {
+              final sessionId = provider.activeSessionId;
+              if (sessionId == null || sessionId.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFF9800), width: 1),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: Color(0xFFE65100), size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Hesap seçilmedi',
+                        style: TextStyle(
+                          color: Color(0xFFE65100),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return WhatsappQrConnector(
+                key: ValueKey(sessionId),
+                sessionId: sessionId,
+              );
+            },
+          ),
           const SizedBox(width: 12),
           // Anti-Spam Ayarları butonu
           Tooltip(

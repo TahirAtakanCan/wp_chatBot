@@ -15,6 +15,15 @@ class MessageProvider extends ChangeNotifier {
   String? _sessionId;
   Timer? _pollingTimer;
 
+  // --- WhatsApp Session ---
+  String? _activeSessionId;
+  String? get activeSessionId => _activeSessionId;
+
+  void setActiveSession(String sessionId) {
+    _activeSessionId = sessionId;
+    notifyListeners();
+  }
+
   // --- Kişi Listesi ---
   final TextEditingController phoneController = TextEditingController();
   List<String> _phoneNumbers = [];
@@ -404,6 +413,7 @@ class MessageProvider extends ChangeNotifier {
         'minDelay': minDelay,
         'maxDelay': maxDelay,
         'media': [],
+        if (_activeSessionId != null) 'sessionId': _activeSessionId,
       };
 
       // URL bazlı medyaları ekle
@@ -541,6 +551,7 @@ class MessageProvider extends ChangeNotifier {
         'minDelay': minDelay,
         'maxDelay': maxDelay,
         'media': [],
+        if (_activeSessionId != null) 'sessionId': _activeSessionId,
       };
 
       if (_selectedMediaUrls.isNotEmpty) {

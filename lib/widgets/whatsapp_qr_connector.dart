@@ -8,7 +8,19 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../config/app_config.dart';
 
 class WhatsappQrConnector extends StatefulWidget {
-  const WhatsappQrConnector({super.key});
+  final String sessionId;
+
+  const WhatsappQrConnector({super.key, required this.sessionId});
+
+  /// Belirli bir sessionId için QR dialog'unu doğrudan açar.
+  /// SessionManagementScreen gibi dış ekranlardan kullanılır.
+  static void showQrDialog(BuildContext context, String sessionId) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _StandaloneQrDialog(sessionId: sessionId),
+    );
+  }
 
   @override
   State<WhatsappQrConnector> createState() => _WhatsappQrConnectorState();
@@ -43,8 +55,9 @@ class _WhatsappQrConnectorState extends State<WhatsappQrConnector> {
 
   Future<void> _checkStatus() async {
     try {
+      final sid = Uri.encodeComponent(widget.sessionId);
       final response = await http
-          .get(Uri.parse('$_baseUrl/system-status'))
+          .get(Uri.parse('$_baseUrl/api/session/$sid/status'))
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -180,100 +193,187 @@ class _QrDialog extends StatelessWidget {
   Widget _buildDialog(BuildContext context) {
     final qr = connector._lastQr ?? '';
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 380,
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // WhatsApp İkonu
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: const Color(0xFF25D366),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(Icons.chat, color: Colors.white, size: 30),
-            ),
-            const SizedBox(height: 16),
+    return _buildQrDialogContent(context, qr);
+  }
+}
 
-            // Başlık
-            const Text(
-              'WhatsApp Bağlantısı',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1B5E20),
-              ),
-            ),
-            const SizedBox(height: 8),
+/// Bağımsız QR Dialog: sessionId ile doğrudan açılır, kendi polling'ini yapar.
+/// SessionManagementScreen'den kullanılır.
+class _StandaloneQrDialog extends StatefulWidget {
+  final String sessionId;
 
-            // Açıklama
-            Text(
-              'Telefonunuzda WhatsApp\'ı açın ve\naşağıdaki QR kodu taratın',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
+  const _StandaloneQrDialog({required this.sessionId});
 
-            // QR Kod
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.shade200),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: QrImageView(
-                data: qr,
-                version: QrVersions.auto,
-                size: 220,
-                gapless: true,
-                errorCorrectionLevel: QrErrorCorrectLevel.M,
-              ),
-            ),
-            const SizedBox(height: 24),
+  @override
+  State<_StandaloneQrDialog> createState() => _StandaloneQrDialogState();
+}
 
-            // Bağlantı bekleniyor
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.grey.shade500,
-                  ),
+class _StandaloneQrDialogState extends State<_StandaloneQrDialog> {
+  static final String _baseUrl = AppConfig.baseHost;
+  Timer? _timer;
+  String? _qr;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _checkStatus());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkStatus() async {
+    try {
+      final sid = Uri.encodeComponent(widget.sessionId);
+      final response = await http
+          .get(Uri.parse('$_baseUrl/api/session/$sid/status'))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final connected = data['connected'] as bool? ?? false;
+        final qr = data['qr'] as String?;
+
+        if (connected) {
+          _timer?.cancel();
+          if (mounted) Navigator.of(context).pop();
+          return;
+        }
+        if (qr != null && qr.isNotEmpty && mounted) {
+          setState(() => _qr = qr);
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_qr == null || _qr!.isEmpty) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          width: 380,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(
+                'QR kodu bekleniyor...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  'Bağlantı bekleniyor...',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade500,
-                    fontWeight: FontWeight.w500,
-                  ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return _buildQrDialogContent(context, _qr!);
+  }
+}
+
+/// Ortak QR dialog görsel içeriği
+Widget _buildQrDialogContent(BuildContext context, String qr) {
+  return Dialog(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    child: Container(
+      width: 380,
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // WhatsApp İkonu
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFF25D366),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.chat, color: Colors.white, size: 30),
+          ),
+          const SizedBox(height: 16),
+
+          // Başlık
+          const Text(
+            'WhatsApp Bağlantısı',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B5E20),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Açıklama
+          Text(
+            'Telefonunuzda WhatsApp\'ı açın ve\naşağıdaki QR kodu taratın',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // QR Kod
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-          ],
-        ),
+            child: QrImageView(
+              data: qr,
+              version: QrVersions.auto,
+              size: 220,
+              gapless: true,
+              errorCorrectionLevel: QrErrorCorrectLevel.M,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Bağlantı bekleniyor
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Bağlantı bekleniyor...',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
