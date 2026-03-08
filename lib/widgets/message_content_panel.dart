@@ -246,6 +246,12 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                     theme: theme,
                     badge: provider.hasMedia ? provider.mediaCount : null,
                   ),
+                  Container(
+                    width: 1,
+                    height: 20,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                  ),
                   // Eklenen medya dosya adları (kompakt chip'ler)
                   if (provider.hasMedia) ...[
                     Container(

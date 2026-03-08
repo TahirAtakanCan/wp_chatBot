@@ -53,6 +53,75 @@ class MessageProvider extends ChangeNotifier {
   int get mediaCount => _selectedMediaUrls.length;
   bool get hasMedia => _selectedMediaUrls.isNotEmpty;
 
+  // ==========================================
+  // BASE64 MEDYA SİSTEMİ (Web + Desktop uyumlu)
+  // ==========================================
+  final List<Map<String, String>> _base64MediaList = [];
+  List<Map<String, String>> get base64MediaList => List.unmodifiable(_base64MediaList);
+  int get base64MediaCount => _base64MediaList.length;
+  bool get hasBase64Media => _base64MediaList.isNotEmpty;
+
+  /// FilePicker ile resim seçer, Base64'e çevirip listeye ekler
+  Future<bool> pickAndAddBase64Media() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        _addLog('[BİLGİ] Resim seçimi iptal edildi.');
+        return false;
+      }
+
+      final file = result.files.first;
+      if (file.bytes == null) {
+        _addLog('[HATA] Dosya okunamadı (Bytes null).');
+        return false;
+      }
+
+      final base64Image = base64Encode(file.bytes!);
+      final ext = file.name.split('.').last.toLowerCase();
+      final mimeType = switch (ext) {
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'png'           => 'image/png',
+        'gif'           => 'image/gif',
+        'webp'          => 'image/webp',
+        'bmp'           => 'image/bmp',
+        _               => 'image/jpeg',
+      };
+
+      _base64MediaList.add({
+        'fileName': file.name,
+        'imageBase64': base64Image,
+        'mimeType': mimeType,
+      });
+
+      _addLog('[BAŞARILI] Base64 medya eklendi: ${file.name}');
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _addLog('[HATA] Base64 resim seçme hatası: $e');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void removeBase64Media(int index) {
+    if (index >= 0 && index < _base64MediaList.length) {
+      final removed = _base64MediaList.removeAt(index);
+      _addLog('[BİLGİ] "${removed['fileName']}" kaldırıldı.');
+      notifyListeners();
+    }
+  }
+
+  void clearAllBase64Media() {
+    _base64MediaList.clear();
+    _addLog('[BİLGİ] Tüm Base64 medya dosyaları kaldırıldı.');
+    notifyListeners();
+  }
+
   /// Sunucudaki yüklü resimlerin listesini getirir
   Future<List<String>> fetchAvailableMedia() async {
     try {
@@ -337,8 +406,8 @@ class MessageProvider extends ChangeNotifier {
         'media': [],
       };
 
-      // YENİ: Backend'in beklediği MediaRequest listesi formatında URL'leri gönder
-      if (hasMedia) {
+      // URL bazlı medyaları ekle
+      if (_selectedMediaUrls.isNotEmpty) {
         for (var url in _selectedMediaUrls) {
           requestBody['media'].add({
             'url': url,
@@ -474,7 +543,7 @@ class MessageProvider extends ChangeNotifier {
         'media': [],
       };
 
-      if (hasMedia) {
+      if (_selectedMediaUrls.isNotEmpty) {
         for (var url in _selectedMediaUrls) {
           requestBody['media'].add({
             'url': url,
@@ -517,8 +586,8 @@ class MessageProvider extends ChangeNotifier {
     _sessionId = null;
     _logs.clear();
     _selectedMediaUrls.clear();
+    _base64MediaList.clear();
     _lastLoadedFileName = null;
-    _originalFileNumbers.clear();
     notifyListeners();
   }
 
