@@ -5,12 +5,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 import '../models/sending_state.dart';
 
 class MessageProvider extends ChangeNotifier {
   // --- API Ayarları ---
-  final String _baseUrl = 'http://94.130.231.165:8080/api/send';
-  final String _mediaApiUrl = 'http://94.130.231.165:8080/api/media'; // Resimleri çekeceğimiz yeni API
+  final String _baseUrl = AppConfig.apiSendUrl;
+  final String _mediaApiUrl = AppConfig.apiMediaUrl;
   String? _sessionId;
   Timer? _pollingTimer;
 
@@ -69,6 +70,7 @@ class MessageProvider extends ChangeNotifier {
   /// Bilgisayardan resim seçip sunucuya yükler, dönen URL'i listeye ekler
   Future<bool> uploadMediaFromDevice() async {
     try {
+      // 1. withData: true KESİNLİKLE OLMALI (Hem Web hem Windows için dosyayı RAM'e alır)
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: false,
@@ -81,8 +83,10 @@ class MessageProvider extends ChangeNotifier {
       }
 
       final file = result.files.first;
+
+      // 2. path yerine tekrar bytes kontrolü yapıyoruz
       if (file.bytes == null) {
-        _addLog('[HATA] Dosya okunamadı.');
+        _addLog('[HATA] Dosya okunamadı (Bytes null).');
         return false;
       }
 
@@ -93,6 +97,8 @@ class MessageProvider extends ChangeNotifier {
         'POST',
         Uri.parse('$_mediaApiUrl/upload'),
       );
+
+      // 3. Dosyayı bayt olarak yüklüyoruz. (Hem Web'de hem Windows'ta %100 çalışır)
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
@@ -115,18 +121,18 @@ class MessageProvider extends ChangeNotifier {
 
         if (url != null) {
           addMediaUrl(url);
-          _addLog('[BAŞARILI] "${file.name}" yüklendi → $url');
+          _addLog('[BAŞARILI] Yüklendi → $url');
           return true;
         } else {
-          _addLog('[HATA] Resim sunucuya yüklendi ama geri dönen URL okunamadı.');
+          _addLog('[HATA] Resim yüklendi ama geri dönen URL okunamadı.');
           return false;
         }
       } else {
-        _addLog('[HATA] Yükleme başarısız (${response.statusCode}): ${response.body}');
+        _addLog('[HATA] Yükleme başarısız (${response.statusCode})');
         return false;
       }
     } catch (e) {
-      _addLog('[HATA] Dosya yüklenirken hata: $e');
+      _addLog('[HATA] Yükleme sırasında kritik hata: $e');
       notifyListeners();
       return false;
     }

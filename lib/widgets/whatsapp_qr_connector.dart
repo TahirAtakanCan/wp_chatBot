@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../config/app_config.dart';
+
 class WhatsappQrConnector extends StatefulWidget {
   const WhatsappQrConnector({super.key});
 
@@ -13,7 +15,7 @@ class WhatsappQrConnector extends StatefulWidget {
 }
 
 class _WhatsappQrConnectorState extends State<WhatsappQrConnector> {
-  static const String _baseUrl = 'http://94.130.231.165:8080';
+  static final String _baseUrl = AppConfig.baseHost;
 
   Timer? _timer;
   bool _connected = false;
