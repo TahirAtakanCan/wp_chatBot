@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'providers/auth_provider.dart';
 import 'providers/message_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/user_qr_screen.dart';
 
 void main() {
   runApp(const MainApp());
@@ -12,8 +15,11 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => MessageProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => MessageProvider()),
+      ],
       child: MaterialApp(
         title: 'Toplu Mesaj Gönderim Arayüzü',
         debugShowCheckedModeBanner: false,
@@ -39,8 +45,52 @@ class MainApp extends StatelessWidget {
             surfaceTintColor: Colors.transparent,
           ),
         ),
-        home: const HomeScreen(),
+        home: const _AuthGate(),
       ),
     );
+  }
+}
+
+/// Uygulama açılışında oturum durumuna göre yönlendirme yapar.
+class _AuthGate extends StatefulWidget {
+  const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    await context.read<AuthProvider>().tryAutoLogin();
+    if (mounted) setState(() => _checking = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final auth = context.watch<AuthProvider>();
+
+    if (!auth.isLoggedIn) {
+      return const LoginScreen();
+    }
+
+    if (auth.isAdmin) {
+      return const HomeScreen();
+    }
+
+    return UserQrScreen(sessionId: auth.sessionId ?? '');
   }
 }

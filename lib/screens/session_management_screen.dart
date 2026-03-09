@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/session_model.dart';
+import '../providers/auth_provider.dart';
 import '../providers/message_provider.dart';
+import '../services/auth_service.dart';
 import '../services/session_service.dart';
 import '../widgets/whatsapp_qr_connector.dart';
 
@@ -35,8 +39,18 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
     super.dispose();
   }
 
+  Future<SessionService> _getSessionService() async {
+    String token = context.read<AuthProvider>().token ?? '';
+    if (token.isEmpty) {
+      token = await AuthService.getToken() ?? '';
+      debugPrint('[SessionMgmt] AuthProvider token boş, SharedPreferences\'tan okundu: ${token.isNotEmpty ? "VAR (${token.length} karakter)" : "BOŞ"}');
+    }
+    return SessionService(token: token);
+  }
+
   Future<void> _loadSessions() async {
-    final sessions = await SessionService.getAllSessions();
+    final service = await _getSessionService();
+    final sessions = await service.getAllSessions();
     if (mounted) {
       setState(() {
         _sessions = sessions;
@@ -46,7 +60,13 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
   }
 
   Future<void> _createSession(String sessionId) async {
-    final ok = await SessionService.createSession(sessionId);
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
+
+    debugPrint('TOKEN DEGERI: $token');
+
+    final service = SessionService(token: token);
+    final ok = await service.createSession(sessionId);
     if (ok) {
       _loadSessions();
       // Session oluşturulduktan sonra otomatik QR dialog aç
@@ -68,7 +88,8 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
   }
 
   Future<void> _deleteSession(String sessionId) async {
-    final ok = await SessionService.deleteSession(sessionId);
+    final service = await _getSessionService();
+    final ok = await service.deleteSession(sessionId);
     if (ok) {
       _loadSessions();
     } else if (mounted) {

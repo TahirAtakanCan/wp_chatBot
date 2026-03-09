@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/session_model.dart';
+import '../providers/auth_provider.dart';
 import '../providers/message_provider.dart';
 import '../services/session_service.dart';
 
@@ -22,7 +23,8 @@ class _SendingSettingsPanelState extends State<SendingSettingsPanel> {
   }
 
   Future<void> _loadSessions() async {
-    final sessions = await SessionService.getAllSessions();
+    final token = context.read<AuthProvider>().token ?? '';
+    final sessions = await SessionService(token: token).getAllSessions();
     if (mounted) {
       setState(() {
         _connectedSessions =

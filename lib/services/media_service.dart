@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import '../services/auth_service.dart';
 
 class MediaService {
   /// Resmi Base64 formatında JSON body ile sunucuya gönderir.
@@ -32,9 +33,14 @@ class MediaService {
         _               => 'image/jpeg',
       };
 
+      final token = await AuthService.getToken();
+      final headers = token != null
+          ? AppConfig.authHeaders(token)
+          : <String, String>{'Content-Type': 'application/json'};
+
       final response = await http.post(
         Uri.parse('${AppConfig.apiMediaUrl}/send'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode({
           'phone': phone,
           'imageBase64': base64Image,

@@ -15,6 +15,16 @@ class MessageProvider extends ChangeNotifier {
   String? _sessionId;
   Timer? _pollingTimer;
 
+  /// SharedPreferences'tan token okuyarak Authorization header oluşturur.
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
   // --- WhatsApp Session ---
   String? _activeSessionId;
   String? get activeSessionId => _activeSessionId;
@@ -134,7 +144,8 @@ class MessageProvider extends ChangeNotifier {
   /// Sunucudaki yüklü resimlerin listesini getirir
   Future<List<String>> fetchAvailableMedia() async {
     try {
-      final response = await http.get(Uri.parse('$_mediaApiUrl/list'));
+      final headers = await _getAuthHeaders();
+      final response = await http.get(Uri.parse('$_mediaApiUrl/list'), headers: headers);
       if (response.statusCode == 200) {
         List<dynamic> data = jsonDecode(response.body);
         return data.map((e) => e.toString()).toList();
@@ -175,6 +186,10 @@ class MessageProvider extends ChangeNotifier {
         'POST',
         Uri.parse('$_mediaApiUrl/upload'),
       );
+
+      // Auth header ekle
+      final authHeaders = await _getAuthHeaders();
+      request.headers.addAll(authHeaders);
 
       // 3. Dosyayı bayt olarak yüklüyoruz. (Hem Web'de hem Windows'ta %100 çalışır)
       request.files.add(
@@ -427,9 +442,10 @@ class MessageProvider extends ChangeNotifier {
         }
       }
 
+      final authHeaders = await _getAuthHeaders();
       var response = await http.post(
         Uri.parse('$_baseUrl/start'),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders,
         body: jsonEncode(requestBody),
       );
 
@@ -461,7 +477,8 @@ class MessageProvider extends ChangeNotifier {
       if (_sessionId == null) return;
 
       try {
-        var response = await http.get(Uri.parse('$_baseUrl/status/$_sessionId'));
+        final headers = await _getAuthHeaders();
+        var response = await http.get(Uri.parse('$_baseUrl/status/$_sessionId'), headers: headers);
         if (response.statusCode == 200) {
           var data = jsonDecode(utf8.decode(response.bodyBytes)); 
           final newSentCount = (data['sentCount'] ?? 0) + sentOffset;
@@ -504,7 +521,8 @@ class MessageProvider extends ChangeNotifier {
   Future<void> stopSending() async {
     if (_status != SendingStatus.sending || _sessionId == null) return;
     try {
-      var response = await http.post(Uri.parse('$_baseUrl/stop/$_sessionId'));
+      final headers = await _getAuthHeaders();
+      var response = await http.post(Uri.parse('$_baseUrl/stop/$_sessionId'), headers: headers);
       if (response.statusCode == 200) {
         _pollingTimer?.cancel();
         _status = SendingStatus.paused;
@@ -566,9 +584,10 @@ class MessageProvider extends ChangeNotifier {
 
       final previousSent = _sentCount;
 
+      final authHeaders = await _getAuthHeaders();
       var response = await http.post(
         Uri.parse('$_baseUrl/start'),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders,
         body: jsonEncode(requestBody),
       );
 

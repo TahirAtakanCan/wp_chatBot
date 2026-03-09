@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/message_provider.dart';
 import '../screens/session_management_screen.dart';
+import '../screens/user_management_screen.dart';
+import '../screens/login_screen.dart';
 import '../services/session_service.dart';
 import '../widgets/contact_list_panel.dart';
 import '../widgets/message_content_panel.dart';
@@ -38,7 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final provider = context.read<MessageProvider>();
     if (provider.activeSessionId != null) return;
 
-    final sessions = await SessionService.getAllSessions();
+    final token = context.read<AuthProvider>().token ?? '';
+    final sessions = await SessionService(token: token).getAllSessions();
     final connected = sessions.where((s) => s.connected).toList();
 
     if (connected.isNotEmpty) {
@@ -108,19 +112,35 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         scrolledUnderElevation: 1,
         actions: [
-          // WhatsApp Hesap Yönetimi
-          Tooltip(
-            message: 'WhatsApp Hesapları',
-            child: IconButton.filledTonal(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SessionManagementScreen(),
+          // WhatsApp Hesap Yönetimi (sadece ADMIN)
+          if (context.read<AuthProvider>().isAdmin)
+            Tooltip(
+              message: 'WhatsApp Hesapları',
+              child: IconButton.filledTonal(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SessionManagementScreen(),
+                  ),
                 ),
+                icon: const Icon(Icons.phone_android, size: 22),
               ),
-              icon: const Icon(Icons.phone_android, size: 22),
             ),
-          ),
+          const SizedBox(width: 8),
+          // Kullanıcı Yönetimi (sadece ADMIN)
+          if (context.read<AuthProvider>().isAdmin)
+            Tooltip(
+              message: 'Kullanıcılar',
+              child: IconButton.filledTonal(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const UserManagementScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.people, size: 22),
+              ),
+            ),
           const SizedBox(width: 8),
           // WhatsApp bağlantı durumu
           Consumer<MessageProvider>(
@@ -166,6 +186,23 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () =>
                   _scaffoldKey.currentState?.openEndDrawer(),
               icon: const Icon(Icons.shield_outlined, size: 22),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Çıkış butonu
+          Tooltip(
+            message: 'Çıkış Yap',
+            child: IconButton.filledTonal(
+              onPressed: () async {
+                await context.read<AuthProvider>().logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (_) => false,
+                  );
+                }
+              },
+              icon: const Icon(Icons.logout, size: 22),
             ),
           ),
           const SizedBox(width: 12),

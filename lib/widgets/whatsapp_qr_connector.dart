@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
 
@@ -55,9 +56,18 @@ class _WhatsappQrConnectorState extends State<WhatsappQrConnector> {
 
   Future<void> _checkStatus() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+
       final sid = Uri.encodeComponent(widget.sessionId);
       final response = await http
-          .get(Uri.parse('$_baseUrl/api/session/$sid/status'))
+          .get(
+            Uri.parse('$_baseUrl/api/session/$sid/status'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -228,9 +238,18 @@ class _StandaloneQrDialogState extends State<_StandaloneQrDialog> {
 
   Future<void> _checkStatus() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+
       final sid = Uri.encodeComponent(widget.sessionId);
       final response = await http
-          .get(Uri.parse('$_baseUrl/api/session/$sid/status'))
+          .get(
+            Uri.parse('$_baseUrl/api/session/$sid/status'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
