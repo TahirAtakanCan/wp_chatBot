@@ -52,10 +52,11 @@ class MessageProvider extends ChangeNotifier {
   List<String> get splitMessages {
     final text = messageController.text.trim();
     if (text.isEmpty) return [];
+    // Ayraç metni ile böl, ayraç kendisi gönderilmesin
     return text
         .split(messageSplitMarker)
         .map((m) => m.trim())
-        .where((m) => m.isNotEmpty)
+        .where((m) => m.isNotEmpty && m != messageSplitMarker)
         .toList();
   }
 
@@ -419,45 +420,45 @@ class MessageProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final messages = splitMessages.where((m) => m != messageSplitMarker && m.trim().isNotEmpty).toList();
-      
-      Map<String, dynamic> requestBody = {
-        'phoneNumbers': _phoneNumbers,
-        'message': messageController.text.trim(),
-        'messages': messages,
-        'minDelay': minDelay,
-        'maxDelay': maxDelay,
-        'media': [],
-        if (_activeSessionId != null) 'sessionId': _activeSessionId,
-      };
-
-      // URL bazlı medyaları ekle
-      if (_selectedMediaUrls.isNotEmpty) {
-        for (var url in _selectedMediaUrls) {
-          requestBody['media'].add({
-            'url': url,
-            'type': 'image',
-            'fileName': url.split('/').last,
-          });
+      final messages = splitMessages;
+      // Her mesaj parçasını ayrı ayrı gönder
+      for (final msg in messages) {
+        if (msg.isEmpty) continue;
+        Map<String, dynamic> requestBody = {
+          'phoneNumbers': _phoneNumbers,
+          'message': msg,
+          'minDelay': minDelay,
+          'maxDelay': maxDelay,
+          'media': [],
+          if (_activeSessionId != null) 'sessionId': _activeSessionId,
+        };
+        // URL bazlı medyaları ekle
+        if (_selectedMediaUrls.isNotEmpty) {
+          for (var url in _selectedMediaUrls) {
+            requestBody['media'].add({
+              'url': url,
+              'type': 'image',
+              'fileName': url.split('/').last,
+            });
+          }
         }
-      }
-
-      final authHeaders = await _getAuthHeaders();
-      var response = await http.post(
-        Uri.parse('$_baseUrl/start'),
-        headers: authHeaders,
-        body: jsonEncode(requestBody),
-      );
-
-      if (response.statusCode == 200) {
-        var data = jsonDecode(response.body);
-        _sessionId = data['sessionId'];
-        _addLog('[BAŞARILI] API Session ID: $_sessionId');
-        _startPolling();
-      } else {
-        _status = SendingStatus.idle;
-        _addLog('[HATA] API reddetti: ${response.body}');
-        notifyListeners();
+        final authHeaders = await _getAuthHeaders();
+        var response = await http.post(
+          Uri.parse('$_baseUrl/start'),
+          headers: authHeaders,
+          body: jsonEncode(requestBody),
+        );
+        if (response.statusCode == 200) {
+          var data = jsonDecode(response.body);
+          _sessionId = data['sessionId'];
+          _addLog('[BAŞARILI] API Session ID: $_sessionId');
+          _startPolling();
+        } else {
+          _status = SendingStatus.idle;
+          _addLog('[HATA] API reddetti: ${response.body}');
+          notifyListeners();
+          break;
+        }
       }
     } catch (e) {
       _status = SendingStatus.idle;
