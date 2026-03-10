@@ -422,44 +422,45 @@ class MessageProvider extends ChangeNotifier {
     try {
       final messages = splitMessages;
       // Her mesaj parçasını ayrı ayrı gönder
-      for (final msg in messages) {
-        if (msg.isEmpty) continue;
-        Map<String, dynamic> requestBody = {
-          'phoneNumbers': _phoneNumbers,
-          'message': msg,
-          'minDelay': minDelay,
-          'maxDelay': maxDelay,
-          'media': [],
-          if (_activeSessionId != null) 'sessionId': _activeSessionId,
-        };
-        // URL bazlı medyaları ekle
-        if (_selectedMediaUrls.isNotEmpty) {
-          for (var url in _selectedMediaUrls) {
-            requestBody['media'].add({
-              'url': url,
-              'type': 'image',
-              'fileName': url.split('/').last,
-            });
+        for (int i = 0; i < messages.length; i++) {
+          final msg = messages[i];
+          if (msg.isEmpty) continue;
+          Map<String, dynamic> requestBody = {
+            'phoneNumbers': _phoneNumbers,
+            'message': msg,
+            'minDelay': minDelay,
+            'maxDelay': maxDelay,
+            'media': [],
+            if (_activeSessionId != null) 'sessionId': _activeSessionId,
+          };
+          // Sadece ilk mesajda medya ekle
+          if (i == 0 && _selectedMediaUrls.isNotEmpty) {
+            for (var url in _selectedMediaUrls) {
+              requestBody['media'].add({
+                'url': url,
+                'type': 'image',
+                'fileName': url.split('/').last,
+              });
+            }
+          }
+          final authHeaders = await _getAuthHeaders();
+          var response = await http.post(
+            Uri.parse('$_baseUrl/start'),
+            headers: authHeaders,
+            body: jsonEncode(requestBody),
+          );
+          if (response.statusCode == 200) {
+            var data = jsonDecode(response.body);
+            _sessionId = data['sessionId'];
+            _addLog('[BAŞARILI] API Session ID: $_sessionId');
+            _startPolling();
+          } else {
+            _status = SendingStatus.idle;
+            _addLog('[HATA] API reddetti: ${response.body}');
+            notifyListeners();
+            break;
           }
         }
-        final authHeaders = await _getAuthHeaders();
-        var response = await http.post(
-          Uri.parse('$_baseUrl/start'),
-          headers: authHeaders,
-          body: jsonEncode(requestBody),
-        );
-        if (response.statusCode == 200) {
-          var data = jsonDecode(response.body);
-          _sessionId = data['sessionId'];
-          _addLog('[BAŞARILI] API Session ID: $_sessionId');
-          _startPolling();
-        } else {
-          _status = SendingStatus.idle;
-          _addLog('[HATA] API reddetti: ${response.body}');
-          notifyListeners();
-          break;
-        }
-      }
     } catch (e) {
       _status = SendingStatus.idle;
       _addLog('[HATA] Backend bağlantısı kurulamadı: $e');
