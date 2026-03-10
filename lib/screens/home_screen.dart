@@ -91,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'İHH İnsani Yardım Vakfı',
+                  'İHH İnsani Yardım Vakfı - Seydişehir Temsilciliği',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
