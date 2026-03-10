@@ -2,7 +2,7 @@
 /// [isLocal] = true  → localhost'a bağlanır (geliştirme)
 /// [isLocal] = false → uzak sunucuya bağlanır (canlı)
 class AppConfig {
-  static const bool isLocal = false;
+  static const bool isLocal = true;
 
   static const String _localHost = 'http://127.0.0.1:8080';
   static const String _remoteHost = 'http://94.130.231.165:8080';

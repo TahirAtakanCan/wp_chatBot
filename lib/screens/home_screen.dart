@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/message_provider.dart';
 import '../screens/session_management_screen.dart';
+import '../screens/templates_screen.dart';
 import '../screens/user_management_screen.dart';
 import '../screens/login_screen.dart';
 import '../services/session_service.dart';
@@ -80,8 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: const Color(0xFF1B5E20),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.public,
-                      color: Colors.white, size: 22),
+                  child:
+                      const Icon(Icons.public, color: Colors.white, size: 22),
                 ),
               ),
             ),
@@ -112,6 +113,19 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         scrolledUnderElevation: 1,
         actions: [
+          Tooltip(
+            message: 'Şablonlar',
+            child: IconButton.filledTonal(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const TemplatesScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.bookmark, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
           // WhatsApp Hesap Yönetimi (sadece ADMIN)
           if (context.read<AuthProvider>().isAdmin)
             Tooltip(
@@ -148,11 +162,13 @@ class _HomeScreenState extends State<HomeScreen> {
               final sessionId = provider.activeSessionId;
               if (sessionId == null || sessionId.isEmpty) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFF3E0),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFF9800), width: 1),
+                    border:
+                        Border.all(color: const Color(0xFFFF9800), width: 1),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -183,8 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Tooltip(
             message: 'Anti-Spam Ayarları',
             child: IconButton.filledTonal(
-              onPressed: () =>
-                  _scaffoldKey.currentState?.openEndDrawer(),
+              onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
               icon: const Icon(Icons.shield_outlined, size: 22),
             ),
           ),
