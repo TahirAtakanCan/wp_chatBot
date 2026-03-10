@@ -407,6 +407,7 @@ class MessageProvider extends ChangeNotifier {
       _addLog('[HATA] Gönderilecek telefon numarası bulunamadı.');
       return;
     }
+    // Eğer hem mesaj hem medya yoksa gönderim yapılmasın
     if (messageController.text.trim().isEmpty && !hasMedia) {
       _addLog('[HATA] Lütfen bir mesaj metni veya medya ekleyin.');
       return;
@@ -421,7 +422,8 @@ class MessageProvider extends ChangeNotifier {
 
     try {
       final messages = splitMessages;
-      // Her mesaj parçasını ayrı ayrı gönder
+      // Mesajlar varsa her birini ayrı gönder
+      if (messages.isNotEmpty) {
         for (int i = 0; i < messages.length; i++) {
           final msg = messages[i];
           if (msg.isEmpty) continue;
@@ -461,6 +463,40 @@ class MessageProvider extends ChangeNotifier {
             break;
           }
         }
+      } else if (hasMedia) {
+        // Mesaj yok ama medya varsa sadece medya gönder
+        Map<String, dynamic> requestBody = {
+          'phoneNumbers': _phoneNumbers,
+          'message': '',
+          'minDelay': minDelay,
+          'maxDelay': maxDelay,
+          'media': [],
+          if (_activeSessionId != null) 'sessionId': _activeSessionId,
+        };
+        for (var url in _selectedMediaUrls) {
+          requestBody['media'].add({
+            'url': url,
+            'type': 'image',
+            'fileName': url.split('/').last,
+          });
+        }
+        final authHeaders = await _getAuthHeaders();
+        var response = await http.post(
+          Uri.parse('$_baseUrl/start'),
+          headers: authHeaders,
+          body: jsonEncode(requestBody),
+        );
+        if (response.statusCode == 200) {
+          var data = jsonDecode(response.body);
+          _sessionId = data['sessionId'];
+          _addLog('[BAŞARILI] API Session ID: $_sessionId');
+          _startPolling();
+        } else {
+          _status = SendingStatus.idle;
+          _addLog('[HATA] API reddetti: ${response.body}');
+          notifyListeners();
+        }
+      }
     } catch (e) {
       _status = SendingStatus.idle;
       _addLog('[HATA] Backend bağlantısı kurulamadı: $e');
