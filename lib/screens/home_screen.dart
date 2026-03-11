@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ihh_project_chatbot/screens/contacts_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/message_provider.dart';
@@ -25,6 +26,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Timer? _autoSelectTimer;
+  List<String> _selectedContactNumbers = [];
 
   @override
   void initState() {
@@ -113,6 +115,35 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         scrolledUnderElevation: 1,
         actions: [
+          Tooltip(
+            message: 'Rehber',
+            child: IconButton.filledTonal(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ContactsScreen(
+                      initiallySelectedNumbers: _selectedContactNumbers,
+                    ),
+                  ),
+                );
+                if (result == null) {
+                  // Seçimi Temizle ile dönüldü
+                  setState(() {
+                    _selectedContactNumbers = [];
+                  });
+                } else if (result is List<String>) {
+                  setState(() {
+                    _selectedContactNumbers.addAll(
+                      result.where((num) => !_selectedContactNumbers.contains(num)),
+                    );
+                  });
+                }
+              },
+              icon: const Icon(Icons.contacts, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
           Tooltip(
             message: 'Şablonlar',
             child: IconButton.filledTonal(
@@ -235,9 +266,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Sol panel - Kişi Listesi
-                  const Expanded(
+                  Expanded(
                     flex: 4,
-                    child: ContactListPanel(),
+                    child: ContactListPanel(
+                      rehberdenSecilenler: _selectedContactNumbers,
+                      onRehberdenSec: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ContactsScreen(
+                              initiallySelectedNumbers: _selectedContactNumbers,
+                            ),
+                          ),
+                        );
+                        if (result == null) {
+                          setState(() {
+                            _selectedContactNumbers.clear();
+                          });
+                        } else if (result is List<String>) {
+                          setState(() {
+                            _selectedContactNumbers.addAll(
+                              result.where((num) => !_selectedContactNumbers.contains(num)),
+                            );
+                          });
+                        }
+                      },
+                    ),
                   ),
                   const SizedBox(width: 16),
                   // Sağ panel - Mesaj + Aksiyon
