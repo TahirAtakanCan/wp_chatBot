@@ -55,16 +55,39 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _importCsv() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['csv']);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv']
+    );
     if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final csvContent = await file.readAsString();
-      final success = await _contactService.importContacts(csvContent);
-      if (success) {
-        await _fetchContacts();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('CSV başarıyla içe aktarıldı.')));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('CSV içe aktarılamadı.')));
+      final filePath = result.files.single.path!;
+      final file = File(filePath);
+      try {
+        final csvContent = await file.readAsString();
+        final success = await _contactService.importContacts(csvContent);
+        // Dosyayı sil (başarılı olsun ya da olmasın)
+        try {
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (e) {
+          // Silme hatası kritik değil, devam et
+          debugPrint('Dosya silinemedi: $e');
+        }
+        if (success) {
+          await _fetchContacts();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('CSV başarıyla içe aktarıldı.'))
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('CSV içe aktarılamadı.'))
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Dosya okunamadı: $e'))
+        );
       }
     }
   }
@@ -110,6 +133,33 @@ class _ContactsScreenState extends State<ContactsScreen> {
       .map((c) => (c.name.isNotEmpty ? '${c.name} - ${c.phone}' : c.phone))
       .toList();
     Navigator.pop(context, selectedContacts);
+  }
+
+  Future<void> _deleteAllContacts() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Tüm rehber silinecek'),
+        content: Text('Bu işlem geri alınamaz. Emin misiniz?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('İptal')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Sil')),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final success = await _contactService.deleteAllContacts();
+      if (success) {
+        await _fetchContacts();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Tüm rehber başarıyla silindi.')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Rehber silinemedi.')),
+        );
+      }
+    }
   }
 
   @override
@@ -197,6 +247,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
             icon: Icon(Icons.person_add),
             label: Text('Seçilenleri Ekle'),
             onPressed: _onAddSelected,
+          ),
+          SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'deleteAll',
+            backgroundColor: Colors.red,
+            icon: Icon(Icons.delete_forever),
+            label: Text('Rehberi Sil'),
+            onPressed: _deleteAllContacts,
           ),
         ],
       ),

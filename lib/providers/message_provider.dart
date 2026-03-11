@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,11 @@ class MessageProvider extends ChangeNotifier {
 
   void setActiveSession(String sessionId) {
     _activeSessionId = sessionId;
+    // Kişi rehberi ve dosya verilerini sıfırla
+    phoneController.clear();
+    _phoneNumbers = [];
+    _lastLoadedFileName = null;
+    _originalFileNumbers = [];
     notifyListeners();
   }
 
@@ -272,6 +278,19 @@ class MessageProvider extends ChangeNotifier {
       final file = result.files.first;
       final extension = file.extension?.toLowerCase() ?? '';
       List<String> numbers = [];
+
+      // Dosya CSV ise, işlendikten sonra sil
+      if (extension == 'csv' && file.path != null) {
+        try {
+          final csvFile = File(file.path!);
+          if (await csvFile.exists()) {
+            await csvFile.delete();
+            _addLog('[BİLGİ] CSV dosyası silindi: ${file.name}');
+          }
+        } catch (e) {
+          _addLog('[UYARI] CSV dosyası silinemedi: $e');
+        }
+      }
 
       if (extension == 'txt' || extension == 'csv') {
         final bytes = file.bytes;

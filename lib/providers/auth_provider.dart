@@ -50,6 +50,10 @@ class AuthProvider extends ChangeNotifier {
     await AuthService.logout();
     _currentUser = null;
     _errorMessage = null;
+    // Kişi rehberi provider'ını da temizle
+    // Eğer MessageProvider veya benzeri bir provider kullanıyorsan:
+    // MessageProvider().phoneController.clear();
+    // MessageProvider()._phoneNumbers = [];
     notifyListeners();
   }
 }

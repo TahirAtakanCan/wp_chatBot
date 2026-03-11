@@ -5,6 +5,17 @@ import '../models/contact_model.dart';
 import 'auth_service.dart';
 
 class ContactService {
+    Future<bool> deleteAllContacts() async {
+      final token = await _getToken();
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/api/contacts/all'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      return response.statusCode == 200;
+    }
   final String _baseUrl = AppConfig.baseHost;
 
   Future<String?> _getToken() async {
