@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/message_provider.dart';
@@ -7,7 +6,9 @@ import '../utils/phone_formatter.dart';
 class ContactListPanel extends StatefulWidget {
   final List<String>? rehberdenSecilenler;
   final VoidCallback? onRehberdenSec;
-  const ContactListPanel({Key? key, this.rehberdenSecilenler, this.onRehberdenSec}) : super(key: key);
+  const ContactListPanel(
+      {Key? key, this.rehberdenSecilenler, this.onRehberdenSec})
+      : super(key: key);
 
   @override
   State<ContactListPanel> createState() => _ContactListPanelState();
@@ -17,8 +18,8 @@ class _ContactListPanelState extends State<ContactListPanel> {
   @override
   void didUpdateWidget(covariant ContactListPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // rehberdenSecilenler boşsa rehberden eklenen satırları temizle
-    if (widget.rehberdenSecilenler != null && widget.rehberdenSecilenler!.isEmpty) {
+    if (widget.rehberdenSecilenler != null &&
+        widget.rehberdenSecilenler!.isEmpty) {
       final provider = context.read<MessageProvider>();
       final lines = provider.phoneController.text.split('\n');
       final manualLines = lines.where((line) {
@@ -34,12 +35,17 @@ class _ContactListPanelState extends State<ContactListPanel> {
           provider.parsePhoneNumbers();
         });
       });
-    }
-    // rehberdenSecilenler boş değilse eklenen satırları TextField'a ekle
-    else if (widget.rehberdenSecilenler != null && widget.rehberdenSecilenler!.isNotEmpty) {
+    } else if (widget.rehberdenSecilenler != null &&
+        widget.rehberdenSecilenler!.isNotEmpty) {
       final provider = context.read<MessageProvider>();
-      final currentLines = provider.phoneController.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      final newLines = widget.rehberdenSecilenler!.where((line) => !currentLines.contains(line)).toList();
+      final currentLines = provider.phoneController.text
+          .split('\n')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final newLines = widget.rehberdenSecilenler!
+          .where((line) => !currentLines.contains(line))
+          .toList();
       if (newLines.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           setState(() {
@@ -71,12 +77,10 @@ class _ContactListPanelState extends State<ContactListPanel> {
                 const SizedBox(width: 8),
                 Text(
                   'Kişi Listesi',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
-                // Numara sayacı rozeti
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -112,25 +116,29 @@ class _ContactListPanelState extends State<ContactListPanel> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  icon: Icon(Icons.clear_all),
-                  label: Text('Seçimi Temizle'),
+                  icon: const Icon(Icons.clear_all),
+                  label: const Text('Seçimi Temizle'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.surface,
                     foregroundColor: theme.colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
                   ),
                   onPressed: () {
                     final provider = context.read<MessageProvider>();
-                    final lines = provider.phoneController.text.split('\n');
+                    final lines =
+                        provider.phoneController.text.split('\n');
                     final manualLines = lines.where((line) {
                       final trimmed = line.trim();
                       if (trimmed.isEmpty) return false;
                       if (trimmed.contains('-')) return false;
-                      if (RegExp(r'^\d{11,}$').hasMatch(trimmed)) return false;
+                      if (RegExp(r'^\d{11,}$').hasMatch(trimmed))
+                        return false;
                       return true;
                     }).toList();
                     setState(() {
-                      provider.phoneController.text = manualLines.join('\n');
+                      provider.phoneController.text =
+                          manualLines.join('\n');
                       provider.parsePhoneNumbers();
                     });
                   },
@@ -165,31 +173,17 @@ class _ContactListPanelState extends State<ContactListPanel> {
 
             const SizedBox(height: 10),
 
-            // Dosyadan Yükle ve Rehberden Seç butonları
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: provider.loadFromFile,
-                    icon: const Icon(Icons.upload_file, size: 18),
-                    label: const Text('TXT / Excel\'den Yükle'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
+            // Sadece Rehberden Seç butonu — tam genişlik
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: widget.onRehberdenSec,
+                icon: const Icon(Icons.contacts, size: 18),
+                label: const Text('Rehberden Seç'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: widget.onRehberdenSec,
-                    icon: const Icon(Icons.contacts, size: 18),
-                    label: const Text('Rehberden Seç'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
