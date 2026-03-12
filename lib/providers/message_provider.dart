@@ -16,7 +16,6 @@ class MessageProvider extends ChangeNotifier {
   String? _sessionId;
   Timer? _pollingTimer;
 
-  /// SharedPreferences'tan token okuyarak Authorization header oluşturur.
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
@@ -32,7 +31,6 @@ class MessageProvider extends ChangeNotifier {
 
   void setActiveSession(String sessionId) {
     _activeSessionId = sessionId;
-    // Kişi rehberi ve dosya verilerini sıfırla
     phoneController.clear();
     _phoneNumbers = [];
     _lastLoadedFileName = null;
@@ -58,7 +56,6 @@ class MessageProvider extends ChangeNotifier {
   List<String> get splitMessages {
     final text = messageController.text.trim();
     if (text.isEmpty) return [];
-    // Ayraç metni ile böl, ayraç kendisi gönderilmesin
     return text
         .split(messageSplitMarker)
         .map((m) => m.trim())
@@ -71,8 +68,31 @@ class MessageProvider extends ChangeNotifier {
     return parts.isEmpty ? 0 : parts.length;
   }
 
+  // --- Kişiselleştirme ---
+  bool _personalizedMessage = false;
+  bool get personalizedMessage => _personalizedMessage;
+
+  void togglePersonalizedMessage() {
+    _personalizedMessage = !_personalizedMessage;
+    notifyListeners();
+  }
+
+  /// "İsim Soyisim - 905551234567" → "İsim Soyisim"
+  String _extractName(String entry) {
+    if (entry.contains(' - ')) {
+      return entry.substring(0, entry.lastIndexOf(' - ')).trim();
+    }
+    return '';
+  }
+
+  /// Mesaj içindeki {isim} → gerçek isim (yoksa "kardeşim")
+  String _personalize(String message, String entry) {
+    final name = _extractName(entry);
+    return message.replaceAll('{isim}', name.isNotEmpty ? name : 'kardeşim');
+  }
+
   // ==========================================
-  // YENİ MEDYA SİSTEMİ (URL BAZLI)
+  // MEDYA SİSTEMİ (URL BAZLI)
   // ==========================================
   final List<String> _selectedMediaUrls = [];
   List<String> get attachedMedia => List.unmodifiable(_selectedMediaUrls);
@@ -80,14 +100,14 @@ class MessageProvider extends ChangeNotifier {
   bool get hasMedia => _selectedMediaUrls.isNotEmpty;
 
   // ==========================================
-  // BASE64 MEDYA SİSTEMİ (Web + Desktop uyumlu)
+  // BASE64 MEDYA SİSTEMİ
   // ==========================================
   final List<Map<String, String>> _base64MediaList = [];
-  List<Map<String, String>> get base64MediaList => List.unmodifiable(_base64MediaList);
+  List<Map<String, String>> get base64MediaList =>
+      List.unmodifiable(_base64MediaList);
   int get base64MediaCount => _base64MediaList.length;
   bool get hasBase64Media => _base64MediaList.isNotEmpty;
 
-  /// FilePicker ile resim seçer, Base64'e çevirip listeye ekler
   Future<bool> pickAndAddBase64Media() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -95,35 +115,30 @@ class MessageProvider extends ChangeNotifier {
         allowMultiple: false,
         withData: true,
       );
-
       if (result == null || result.files.isEmpty) {
         _addLog('[BİLGİ] Resim seçimi iptal edildi.');
         return false;
       }
-
       final file = result.files.first;
       if (file.bytes == null) {
         _addLog('[HATA] Dosya okunamadı (Bytes null).');
         return false;
       }
-
       final base64Image = base64Encode(file.bytes!);
       final ext = file.name.split('.').last.toLowerCase();
       final mimeType = switch (ext) {
         'jpg' || 'jpeg' => 'image/jpeg',
-        'png'           => 'image/png',
-        'gif'           => 'image/gif',
-        'webp'          => 'image/webp',
-        'bmp'           => 'image/bmp',
-        _               => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'bmp' => 'image/bmp',
+        _ => 'image/jpeg',
       };
-
       _base64MediaList.add({
         'fileName': file.name,
         'imageBase64': base64Image,
         'mimeType': mimeType,
       });
-
       _addLog('[BAŞARILI] Base64 medya eklendi: ${file.name}');
       notifyListeners();
       return true;
@@ -148,11 +163,11 @@ class MessageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sunucudaki yüklü resimlerin listesini getirir
   Future<List<String>> fetchAvailableMedia() async {
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(Uri.parse('$_mediaApiUrl/list'), headers: headers);
+      final response = await http.get(
+          Uri.parse('$_mediaApiUrl/list'), headers: headers);
       if (response.statusCode == 200) {
         List<dynamic> data = jsonDecode(response.body);
         return data.map((e) => e.toString()).toList();
@@ -163,49 +178,34 @@ class MessageProvider extends ChangeNotifier {
     return [];
   }
 
-  /// Bilgisayardan resim seçip sunucuya yükler, dönen URL'i listeye ekler
   Future<bool> uploadMediaFromDevice() async {
     try {
-      // 1. withData: true KESİNLİKLE OLMALI (Hem Web hem Windows için dosyayı RAM'e alır)
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: false,
         withData: true,
       );
-
       if (result == null || result.files.isEmpty) {
         _addLog('[BİLGİ] Resim seçimi iptal edildi.');
         return false;
       }
-
       final file = result.files.first;
-
-      // 2. path yerine tekrar bytes kontrolü yapıyoruz
       if (file.bytes == null) {
         _addLog('[HATA] Dosya okunamadı (Bytes null).');
         return false;
       }
-
       _addLog('[YÜKLEME] "${file.name}" sunucuya yükleniyor...');
       notifyListeners();
 
       final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$_mediaApiUrl/upload'),
-      );
-
-      // Auth header ekle
+          'POST', Uri.parse('$_mediaApiUrl/upload'));
       final authHeaders = await _getAuthHeaders();
       request.headers.addAll(authHeaders);
-
-      // 3. Dosyayı bayt olarak yüklüyoruz. (Hem Web'de hem Windows'ta %100 çalışır)
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          file.bytes!,
-          filename: file.name,
-        ),
-      );
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        file.bytes!,
+        filename: file.name,
+      ));
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
@@ -218,7 +218,6 @@ class MessageProvider extends ChangeNotifier {
             url = data['url'] as String?;
           }
         } catch (_) {}
-
         if (url != null) {
           addMediaUrl(url);
           _addLog('[BAŞARILI] Yüklendi → $url');
@@ -238,7 +237,6 @@ class MessageProvider extends ChangeNotifier {
     }
   }
 
-  /// Kullanıcı arayüzden bir resim seçtiğinde listeye ekler
   void addMediaUrl(String url) {
     if (!_selectedMediaUrls.contains(url)) {
       _selectedMediaUrls.add(url);
@@ -261,7 +259,6 @@ class MessageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Yardımcı metodlar
   Future<void> loadFromFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -269,17 +266,14 @@ class MessageProvider extends ChangeNotifier {
         allowedExtensions: ['txt', 'xlsx', 'xls', 'csv'],
         withData: true,
       );
-
       if (result == null || result.files.isEmpty) {
         _addLog('[BİLGİ] Dosya seçimi iptal edildi.');
         return;
       }
-
       final file = result.files.first;
       final extension = file.extension?.toLowerCase() ?? '';
       List<String> numbers = [];
 
-      // Dosya CSV ise, işlendikten sonra sil
       if (extension == 'csv' && file.path != null) {
         try {
           final csvFile = File(file.path!);
@@ -334,7 +328,6 @@ class MessageProvider extends ChangeNotifier {
         return;
       }
 
-      // Devam durumunu kontrol et
       final resumeState = await _getResumeState(file.name);
       final totalCount = numbers.length;
 
@@ -342,10 +335,12 @@ class MessageProvider extends ChangeNotifier {
         final alreadySent = resumeState['sentCount'] as int;
         if (alreadySent > 0 && alreadySent < numbers.length) {
           numbers = numbers.sublist(alreadySent);
-          _addLog('[DEVAM] "${file.name}" dosyasında $alreadySent/$totalCount numara daha önce gönderilmiş.');
+          _addLog(
+              '[DEVAM] "${file.name}" dosyasında $alreadySent/$totalCount numara daha önce gönderilmiş.');
           _addLog('[DEVAM] Kalan ${numbers.length} numaradan devam ediliyor.');
         } else if (alreadySent >= numbers.length) {
-          _addLog('[BİLGİ] "${file.name}" dosyasındaki tüm numaralar zaten gönderilmiş. Liste sıfırdan yükleniyor.');
+          _addLog(
+              '[BİLGİ] "${file.name}" dosyasındaki tüm numaralar zaten gönderilmiş. Liste sıfırdan yükleniyor.');
           await _clearResumeState();
         }
       }
@@ -353,12 +348,13 @@ class MessageProvider extends ChangeNotifier {
       _lastLoadedFileName = file.name;
       _originalFileNumbers = List.from(numbers);
 
-      // Mevcut numaralara ekle
       final existing = phoneController.text.trim();
       final newContent = numbers.join('\n');
-      phoneController.text = existing.isEmpty ? newContent : '$existing\n$newContent';
+      phoneController.text =
+          existing.isEmpty ? newContent : '$existing\n$newContent';
       parsePhoneNumbers();
-      _addLog('[BAŞARILI] ${numbers.length} numara dosyadan yüklendi (${file.name}).');
+      _addLog(
+          '[BAŞARILI] ${numbers.length} numara dosyadan yüklendi (${file.name}).');
       notifyListeners();
     } catch (e) {
       _addLog('[HATA] Dosya okunurken hata: $e');
@@ -374,8 +370,10 @@ class MessageProvider extends ChangeNotifier {
   // ==========================================
   // GÖNDERİM AYARLARI VE DURUMU
   // ==========================================
-  final TextEditingController minDelayController = TextEditingController(text: '5');
-  final TextEditingController maxDelayController = TextEditingController(text: '15');
+  final TextEditingController minDelayController =
+      TextEditingController(text: '5');
+  final TextEditingController maxDelayController =
+      TextEditingController(text: '15');
 
   int get minDelay => int.tryParse(minDelayController.text) ?? 5;
   int get maxDelay => int.tryParse(maxDelayController.text) ?? 15;
@@ -398,16 +396,25 @@ class MessageProvider extends ChangeNotifier {
     if (raw.isEmpty) {
       _phoneNumbers = [];
     } else {
-      var rawList = raw.split(RegExp(r'[\n,;]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      final rawList = raw
+          .split(RegExp(r'[\n,;]+'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
       _phoneNumbers = [];
-      for (var number in rawList) {
-        var cleaned = number.replaceAll(RegExp(r'[^0-9]'), '');
+      for (var entry in rawList) {
+        // "İsim - Numara" formatından numarayı ayıkla
+        String numberPart = entry;
+        if (entry.contains(' - ')) {
+          numberPart = entry.substring(entry.lastIndexOf(' - ') + 3).trim();
+        }
+        var cleaned = numberPart.replaceAll(RegExp(r'[^0-9]'), '');
         if (cleaned.startsWith('0') && cleaned.length == 11) {
           cleaned = '90${cleaned.substring(1)}';
         } else if (cleaned.length == 10 && cleaned.startsWith('5')) {
           cleaned = '90$cleaned';
-        } 
-        _phoneNumbers.add(cleaned);
+        }
+        if (cleaned.isNotEmpty) _phoneNumbers.add(cleaned);
       }
     }
     notifyListeners();
@@ -420,13 +427,27 @@ class MessageProvider extends ChangeNotifier {
   Future<void> startSending() async {
     if (_status == SendingStatus.sending) return;
 
+
+    // Önce rawEntries'i al (parsePhoneNumbers'dan ÖNCE)
+    final rawEntries = phoneController.text
+        .split(RegExp(r'[\n,;]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
     parsePhoneNumbers();
+
+     // DEBUG — Flutter konsolunda göreceksin
+  debugPrint('=== GÖNDERIM DEBUG ===');
+  debugPrint('rawEntries: $rawEntries');
+  debugPrint('phoneNumbers: $_phoneNumbers');
+  debugPrint('isPersonalized: $_personalizedMessage');
+  debugPrint('messages: ${splitMessages}');
 
     if (_phoneNumbers.isEmpty) {
       _addLog('[HATA] Gönderilecek telefon numarası bulunamadı.');
       return;
     }
-    // Eğer hem mesaj hem medya yoksa gönderim yapılmasın
     if (messageController.text.trim().isEmpty && !hasMedia) {
       _addLog('[HATA] Lütfen bir mesaj metni veya medya ekleyin.');
       return;
@@ -435,43 +456,58 @@ class MessageProvider extends ChangeNotifier {
     _status = SendingStatus.sending;
     _sentCount = 0;
     _progress = 0.0;
-    _logs.clear(); 
+    _logs.clear();
     _addLog('─── Gönderim API\'ye İletiliyor ───');
     notifyListeners();
 
     try {
       final messages = splitMessages;
-      // Mesajlar varsa her birini ayrı gönder
+
       if (messages.isNotEmpty) {
         for (int i = 0; i < messages.length; i++) {
-          final msg = messages[i];
-          if (msg.isEmpty) continue;
+          final msgTemplate = messages[i];
+          if (msgTemplate.isEmpty) continue;
+
+          // Kişiselleştirme açıksa her giriş için ayrı mesaj üret
+          final List<String> personalizedMessages = _personalizedMessage
+              ? rawEntries
+                  .map((entry) => _personalize(msgTemplate, entry))
+                  .toList()
+              : [];
+
+          debugPrint('personalizedMessages: $personalizedMessages');
+          debugPrint('requestBody isPersonalized: $_personalizedMessage');
+
           Map<String, dynamic> requestBody = {
             'phoneNumbers': _phoneNumbers,
-            'message': msg,
+            'message': msgTemplate,
+            'personalizedMessages': personalizedMessages,
+            'isPersonalized': _personalizedMessage,
             'minDelay': minDelay,
             'maxDelay': maxDelay,
             'media': [],
             if (_activeSessionId != null) 'sessionId': _activeSessionId,
           };
-          // Sadece ilk mesajda medya ekle
+
           if (i == 0 && _selectedMediaUrls.isNotEmpty) {
             for (var url in _selectedMediaUrls) {
-              requestBody['media'].add({
+              (requestBody['media'] as List).add({
                 'url': url,
                 'type': 'image',
                 'fileName': url.split('/').last,
               });
             }
           }
+
           final authHeaders = await _getAuthHeaders();
-          var response = await http.post(
+          final response = await http.post(
             Uri.parse('$_baseUrl/start'),
             headers: authHeaders,
             body: jsonEncode(requestBody),
           );
+
           if (response.statusCode == 200) {
-            var data = jsonDecode(response.body);
+            final data = jsonDecode(response.body);
             _sessionId = data['sessionId'];
             _addLog('[BAŞARILI] API Session ID: $_sessionId');
             _startPolling();
@@ -483,30 +519,31 @@ class MessageProvider extends ChangeNotifier {
           }
         }
       } else if (hasMedia) {
-        // Mesaj yok ama medya varsa sadece medya gönder
         Map<String, dynamic> requestBody = {
           'phoneNumbers': _phoneNumbers,
           'message': '',
+          'personalizedMessages': [],
+          'isPersonalized': false,
           'minDelay': minDelay,
           'maxDelay': maxDelay,
           'media': [],
           if (_activeSessionId != null) 'sessionId': _activeSessionId,
         };
         for (var url in _selectedMediaUrls) {
-          requestBody['media'].add({
+          (requestBody['media'] as List).add({
             'url': url,
             'type': 'image',
             'fileName': url.split('/').last,
           });
         }
         final authHeaders = await _getAuthHeaders();
-        var response = await http.post(
+        final response = await http.post(
           Uri.parse('$_baseUrl/start'),
           headers: authHeaders,
           body: jsonEncode(requestBody),
         );
         if (response.statusCode == 200) {
-          var data = jsonDecode(response.body);
+          final data = jsonDecode(response.body);
           _sessionId = data['sessionId'];
           _addLog('[BAŞARILI] API Session ID: $_sessionId');
           _startPolling();
@@ -529,15 +566,16 @@ class MessageProvider extends ChangeNotifier {
 
   void _startPollingWithOffset(int sentOffset) {
     _pollingTimer?.cancel();
-    int _lastBackendLogCount = 0;
+    int lastBackendLogCount = 0;
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_sessionId == null) return;
-
       try {
         final headers = await _getAuthHeaders();
-        var response = await http.get(Uri.parse('$_baseUrl/status/$_sessionId'), headers: headers);
+        final response = await http.get(
+            Uri.parse('$_baseUrl/status/$_sessionId'),
+            headers: headers);
         if (response.statusCode == 200) {
-          var data = jsonDecode(utf8.decode(response.bodyBytes)); 
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
           final newSentCount = (data['sentCount'] ?? 0) + sentOffset;
           if (newSentCount != _sentCount) {
             _sentCount = newSentCount;
@@ -546,17 +584,17 @@ class MessageProvider extends ChangeNotifier {
           _progress = _phoneNumbers.isNotEmpty
               ? _sentCount / _phoneNumbers.length
               : (data['progress'] ?? 0.0);
-          
-          List<dynamic> backendLogs = data['logs'] ?? [];
-          if (backendLogs.length > _lastBackendLogCount) {
-            for (int i = _lastBackendLogCount; i < backendLogs.length; i++) {
+
+          final List<dynamic> backendLogs = data['logs'] ?? [];
+          if (backendLogs.length > lastBackendLogCount) {
+            for (int i = lastBackendLogCount; i < backendLogs.length; i++) {
               _logs.add(backendLogs[i].toString());
             }
-            _lastBackendLogCount = backendLogs.length;
+            lastBackendLogCount = backendLogs.length;
             _scrollToBottom();
           }
 
-          String currentStatus = data['status'];
+          final String currentStatus = data['status'];
           if (currentStatus == 'COMPLETED') {
             _status = SendingStatus.completed;
             _pollingTimer?.cancel();
@@ -570,7 +608,7 @@ class MessageProvider extends ChangeNotifier {
           notifyListeners();
         }
       } catch (e) {
-        print("Polling hatası: $e");
+        debugPrint('Polling hatası: $e');
       }
     });
   }
@@ -579,12 +617,14 @@ class MessageProvider extends ChangeNotifier {
     if (_status != SendingStatus.sending || _sessionId == null) return;
     try {
       final headers = await _getAuthHeaders();
-      var response = await http.post(Uri.parse('$_baseUrl/stop/$_sessionId'), headers: headers);
+      final response = await http
+          .post(Uri.parse('$_baseUrl/stop/$_sessionId'), headers: headers);
       if (response.statusCode == 200) {
         _pollingTimer?.cancel();
         _status = SendingStatus.paused;
         _saveResumeState();
-        _addLog('[DURDURULDU] İşlem kullanıcı tarafından durduruldu. Kaldığınız yerden devam edebilirsiniz.');
+        _addLog(
+            '[DURDURULDU] İşlem kullanıcı tarafından durduruldu. Kaldığınız yerden devam edebilirsiniz.');
         notifyListeners();
       }
     } catch (e) {
@@ -602,7 +642,6 @@ class MessageProvider extends ChangeNotifier {
       return;
     }
 
-    // Daha önce gönderilenleri atla
     final remaining = _phoneNumbers.sublist(_sentCount);
     if (remaining.isEmpty) {
       _addLog('[BİLGİ] Gönderilecek numara kalmadı.');
@@ -613,16 +652,21 @@ class MessageProvider extends ChangeNotifier {
     }
 
     _status = SendingStatus.sending;
-    _addLog('─── Gönderim kaldığı yerden devam ediyor ($_sentCount/${_phoneNumbers.length}) ───');
+    _addLog(
+        '─── Gönderim kaldığı yerden devam ediyor ($_sentCount/${_phoneNumbers.length}) ───');
     notifyListeners();
 
     try {
-      final messages = splitMessages.where((m) => m != messageSplitMarker && m.trim().isNotEmpty).toList();
+      final messages = splitMessages
+          .where((m) => m != messageSplitMarker && m.trim().isNotEmpty)
+          .toList();
 
       Map<String, dynamic> requestBody = {
         'phoneNumbers': remaining,
         'message': messageController.text.trim(),
         'messages': messages,
+        'personalizedMessages': [],
+        'isPersonalized': false,
         'minDelay': minDelay,
         'maxDelay': maxDelay,
         'media': [],
@@ -631,7 +675,7 @@ class MessageProvider extends ChangeNotifier {
 
       if (_selectedMediaUrls.isNotEmpty) {
         for (var url in _selectedMediaUrls) {
-          requestBody['media'].add({
+          (requestBody['media'] as List).add({
             'url': url,
             'type': 'image',
             'fileName': url.split('/').last,
@@ -640,16 +684,15 @@ class MessageProvider extends ChangeNotifier {
       }
 
       final previousSent = _sentCount;
-
       final authHeaders = await _getAuthHeaders();
-      var response = await http.post(
+      final response = await http.post(
         Uri.parse('$_baseUrl/start'),
         headers: authHeaders,
         body: jsonEncode(requestBody),
       );
 
       if (response.statusCode == 200) {
-        var data = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
         _sessionId = data['sessionId'];
         _addLog('[BAŞARILI] Devam ediliyor - API Session ID: $_sessionId');
         _startPollingWithOffset(previousSent);
@@ -702,7 +745,8 @@ class MessageProvider extends ChangeNotifier {
       if (stateJson == null) return null;
       final state = jsonDecode(stateJson) as Map<String, dynamic>;
       final currentMsgHash = messageController.text.trim().hashCode;
-      if (state['fileName'] == fileName && state['messageHash'] == currentMsgHash) {
+      if (state['fileName'] == fileName &&
+          state['messageHash'] == currentMsgHash) {
         return state;
       }
     } catch (_) {}
@@ -719,9 +763,9 @@ class MessageProvider extends ChangeNotifier {
   }
 
   void _addLog(String message) {
-    final timestamp = '${DateTime.now().hour.toString().padLeft(2, '0')}:'
-        '${DateTime.now().minute.toString().padLeft(2, '0')}:'
-        '${DateTime.now().second.toString().padLeft(2, '0')}';
+    final now = DateTime.now();
+    final timestamp =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     _logs.add('[$timestamp] $message');
     _scrollToBottom();
   }

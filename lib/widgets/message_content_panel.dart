@@ -36,17 +36,15 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
     final provider = context.read<MessageProvider>();
     final controller = provider.messageController;
     final sel = controller.selection;
-
     if (!sel.isValid) return;
-
     const sep = '\n✂ ── Mesaj Ayrımı ──\n';
     final text = controller.text;
     final before = text.substring(0, sel.start);
     final after = text.substring(sel.end);
-
     controller.value = TextEditingValue(
       text: '$before$sep$after',
-      selection: TextSelection.collapsed(offset: sel.start + sep.length),
+      selection:
+          TextSelection.collapsed(offset: sel.start + sep.length),
     );
     setState(() {});
   }
@@ -55,7 +53,6 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
     final provider = context.read<MessageProvider>();
     final controller = provider.messageController;
     final selection = controller.selection;
-
     if (!selection.isValid) {
       final nextText = controller.text.isEmpty
           ? templateContent
@@ -68,14 +65,12 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
       final text = controller.text;
       final before = text.substring(0, selection.start);
       final after = text.substring(selection.end);
-
       controller.value = TextEditingValue(
         text: '$before$templateContent$after',
         selection: TextSelection.collapsed(
             offset: selection.start + templateContent.length),
       );
     }
-
     _messageFocusNode.requestFocus();
     setState(() {});
   }
@@ -87,7 +82,6 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
       showDragHandle: true,
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
-
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(sheetContext).size.height * 0.55,
@@ -97,18 +91,16 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 final templates = snapshot.data ?? [];
                 if (templates.isEmpty) {
                   return Center(
                     child: Text(
                       'Henüz kayıtlı şablon bulunmuyor.',
-                      style:
-                          TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant),
                     ),
                   );
                 }
-
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   itemCount: templates.length,
@@ -116,20 +108,14 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                   itemBuilder: (context, index) {
                     final template = templates[index];
                     return ListTile(
-                      leading: Icon(
-                        Icons.bookmark_outline_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                      title: Text(
-                        template.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        template.content,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      leading: Icon(Icons.bookmark_outline_rounded,
+                          color: theme.colorScheme.primary),
+                      title: Text(template.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      subtitle: Text(template.content,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
                       onTap: () {
                         Navigator.pop(sheetContext);
                         _insertTemplateContent(template.content);
@@ -140,71 +126,6 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
               },
             ),
           ),
-        );
-      },
-    );
-  }
-
-  // ignore: unused_element
-  void _showServerMediaDialog(BuildContext context, MessageProvider provider) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Sunucudaki Medyalar'),
-          content: SizedBox(
-            width: 400,
-            height: 400,
-            child: FutureBuilder<List<String>>(
-              future: provider.fetchAvailableMedia(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Sunucuda hiç resim bulunamadı.\n(Önce uploads klasörüne resim atın)',
-                      textAlign: TextAlign.center,
-                    ),
-                  );
-                }
-                return GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: snapshot.data!.length,
-                  itemBuilder: (context, index) {
-                    final url = snapshot.data![index];
-                    return InkWell(
-                      onTap: () {
-                        provider.addMediaUrl(url);
-                        Navigator.pop(context);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(url, fit: BoxFit.cover),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Kapat'),
-            ),
-          ],
         );
       },
     );
@@ -249,15 +170,14 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                 const SizedBox(width: 10),
                 Text(
                   'Mesaj İçeriği',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 if (provider.messagePartCount > 1) ...[
                   const SizedBox(width: 10),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(12),
@@ -279,13 +199,79 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                   label: const Text('Şablon Seç'),
                   style: OutlinedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+
+            // ── Kişiselleştirme Toggle ──
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: provider.personalizedMessage
+                    ? theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.4)
+                    : theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: provider.personalizedMessage
+                      ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                      : theme.colorScheme.outlineVariant
+                          .withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.person_outline_rounded,
+                    size: 16,
+                    color: provider.personalizedMessage
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Kişiselleştirilmiş Mesaj',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: provider.personalizedMessage
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          provider.personalizedMessage
+                              ? 'Mesajda {isim} kullanın → kişi adıyla değiştirilir'
+                              : 'Açınca {isim} ile kişi adı ekleyebilirsiniz',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: provider.personalizedMessage,
+                    onChanged: (_) =>
+                        provider.togglePersonalizedMessage(),
+                    materialTapTargetSize:
+                        MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
 
             // ── Mesaj Yazma Alanı ──
             Expanded(
@@ -297,18 +283,21 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                 textAlignVertical: TextAlignVertical.top,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Mesajınızı yazın...',
+                  hintText: provider.personalizedMessage
+                      ? 'Mesajınızı yazın...\n\nÖrn: Merhaba {isim}, ...'
+                      : 'Mesajınızı yazın...',
                   hintStyle: TextStyle(
                     color: theme.colorScheme.onSurfaceVariant
                         .withValues(alpha: 0.6),
                   ),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerLowest,
+                  fillColor:
+                      theme.colorScheme.surfaceContainerLowest,
                   contentPadding: const EdgeInsets.all(14),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: theme.colorScheme.outlineVariant),
+                    borderSide: BorderSide(
+                        color: theme.colorScheme.outlineVariant),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -325,21 +314,22 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                     ),
                   ),
                 ),
-                style: const TextStyle(fontSize: 14, height: 1.6),
+                style:
+                    const TextStyle(fontSize: 14, height: 1.6),
               ),
             ),
             const SizedBox(height: 8),
 
-            // ── Araç Çubuğu + Medya (tek satır) ──
+            // ── Araç Çubuğu ──
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 4, vertical: 2),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  // Mesaj Ayır
                   _ToolbarButton(
                     icon: Icons.content_cut_rounded,
                     label: 'Mesaj Ayır',
@@ -350,31 +340,26 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                   Container(
                     width: 1,
                     height: 20,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    color:
-                        theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 2),
+                    color: theme.colorScheme.outlineVariant
+                        .withValues(alpha: 0.4),
                   ),
-                  // Bilgisayardan Yükle
                   _ToolbarButton(
                     icon: Icons.upload_file_rounded,
                     label: 'Bilgisayardan Yükle',
                     onTap: () => provider.uploadMediaFromDevice(),
                     theme: theme,
-                    badge: provider.hasMedia ? provider.mediaCount : null,
+                    badge: provider.hasMedia
+                        ? provider.mediaCount
+                        : null,
                   ),
-                  Container(
-                    width: 1,
-                    height: 20,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    color:
-                        theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-                  ),
-                  // Eklenen medya dosya adları (kompakt chip'ler)
                   if (provider.hasMedia) ...[
                     Container(
                       width: 1,
                       height: 20,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 2),
                       color: theme.colorScheme.outlineVariant
                           .withValues(alpha: 0.4),
                     ),
@@ -383,24 +368,34 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                         height: 28,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
-                          itemCount: provider.attachedMedia.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 4),
+                          itemCount:
+                              provider.attachedMedia.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 4),
                           itemBuilder: (context, index) {
-                            final url = provider.attachedMedia[index];
+                            final url =
+                                provider.attachedMedia[index];
                             final fileName =
-                                Uri.decodeComponent(url.split('/').last);
-                            final shortName = fileName.length > 18
-                                ? '${fileName.substring(0, 15)}...'
-                                : fileName;
+                                Uri.decodeComponent(
+                                    url.split('/').last);
+                            final shortName =
+                                fileName.length > 18
+                                    ? '${fileName.substring(0, 15)}...'
+                                    : fileName;
                             return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                              padding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer
+                                color: theme
+                                    .colorScheme.primaryContainer
                                     .withValues(alpha: 0.4),
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius:
+                                    BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: theme.colorScheme.primary
+                                  color: theme
+                                      .colorScheme.primary
                                       .withValues(alpha: 0.2),
                                 ),
                               ),
@@ -409,24 +404,29 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                                 children: [
                                   Icon(Icons.image_outlined,
                                       size: 13,
-                                      color: theme.colorScheme.primary),
+                                      color: theme
+                                          .colorScheme.primary),
                                   const SizedBox(width: 4),
                                   Text(
                                     shortName,
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
-                                      color:
-                                          theme.colorScheme.onPrimaryContainer,
+                                      color: theme.colorScheme
+                                          .onPrimaryContainer,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
                                   InkWell(
-                                    borderRadius: BorderRadius.circular(10),
-                                    onTap: () => provider.removeMedia(index),
-                                    child: Icon(Icons.close_rounded,
+                                    borderRadius:
+                                        BorderRadius.circular(10),
+                                    onTap: () =>
+                                        provider.removeMedia(index),
+                                    child: Icon(
+                                        Icons.close_rounded,
                                         size: 13,
-                                        color: theme.colorScheme.error),
+                                        color: theme
+                                            .colorScheme.error),
                                   ),
                                 ],
                               ),
@@ -437,7 +437,6 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                     ),
                   ],
                   if (!provider.hasMedia) const Spacer(),
-                  // Tümünü temizle
                   if (provider.hasMedia)
                     InkWell(
                       borderRadius: BorderRadius.circular(8),
@@ -446,7 +445,8 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 4),
                         child: Icon(Icons.delete_sweep_outlined,
-                            size: 18, color: theme.colorScheme.error),
+                            size: 18,
+                            color: theme.colorScheme.error),
                       ),
                     ),
                 ],
@@ -485,11 +485,13 @@ class _ToolbarButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 10, vertical: 6),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 15, color: theme.colorScheme.primary),
+              Icon(icon,
+                  size: 15, color: theme.colorScheme.primary),
               const SizedBox(width: 5),
               Text(
                 label,
@@ -502,8 +504,8 @@ class _ToolbarButton extends StatelessWidget {
               if (badge != null) ...[
                 const SizedBox(width: 5),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(10),
@@ -513,7 +515,8 @@ class _ToolbarButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onPrimaryContainer,
+                      color:
+                          theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                 ),
@@ -521,10 +524,11 @@ class _ToolbarButton extends StatelessWidget {
               if (shortcut != null) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
+                    color: theme
+                        .colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
                       color: theme.colorScheme.outlineVariant
@@ -544,99 +548,6 @@ class _ToolbarButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ── Medya Chip ──
-// ignore: unused_element
-class _MediaChip extends StatelessWidget {
-  final String url;
-  final String fileName;
-  final VoidCallback onRemove;
-  final ThemeData theme;
-
-  const _MediaChip({
-    required this.url,
-    required this.fileName,
-    required this.onRemove,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 160,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          // Thumbnail
-          ClipRRect(
-            borderRadius:
-                const BorderRadius.horizontal(left: Radius.circular(9)),
-            child: Image.network(
-              url,
-              width: 56,
-              height: 72,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 56,
-                height: 72,
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Icon(Icons.broken_image_outlined,
-                    size: 22, color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ),
-          // Info + delete
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    fileName,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Sunucu',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Delete button
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onRemove,
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(Icons.close_rounded,
-                    size: 14, color: theme.colorScheme.error),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

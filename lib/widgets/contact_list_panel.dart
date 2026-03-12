@@ -125,20 +125,10 @@ class _ContactListPanelState extends State<ContactListPanel> {
                         horizontal: 12, vertical: 8),
                   ),
                   onPressed: () {
+                    // Sadece numara listesini temizle
                     final provider = context.read<MessageProvider>();
-                    final lines =
-                        provider.phoneController.text.split('\n');
-                    final manualLines = lines.where((line) {
-                      final trimmed = line.trim();
-                      if (trimmed.isEmpty) return false;
-                      if (trimmed.contains('-')) return false;
-                      if (RegExp(r'^\d{11,}$').hasMatch(trimmed))
-                        return false;
-                      return true;
-                    }).toList();
                     setState(() {
-                      provider.phoneController.text =
-                          manualLines.join('\n');
+                      provider.phoneController.text = '';
                       provider.parsePhoneNumbers();
                     });
                   },
@@ -155,7 +145,6 @@ class _ContactListPanelState extends State<ContactListPanel> {
                 expands: true,
                 textAlignVertical: TextAlignVertical.top,
                 onChanged: (_) => provider.parsePhoneNumbers(),
-                inputFormatters: [PhoneNumberFormatter()],
                 decoration: const InputDecoration(
                   hintText:
                       'Telefon numaralarını alt alta yazın...\n\n(555) 123 4567\n(555) 987 6543\n(555) 321 4567',

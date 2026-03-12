@@ -127,18 +127,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 );
-                if (result == null) {
-                  // Seçimi Temizle ile dönüldü
-                  setState(() {
-                    _selectedContactNumbers = [];
-                  });
-                } else if (result is List<String>) {
-                  setState(() {
-                    _selectedContactNumbers.addAll(
-                      result.where((num) => !_selectedContactNumbers.contains(num)),
-                    );
-                  });
-                }
+                // Seçimi Temizle ile dönüldü veya boş liste döndü
+                setState(() {
+                  _selectedContactNumbers = (result is List<String>) ? result : [];
+                });
               },
               icon: const Icon(Icons.contacts, size: 22),
             ),
@@ -279,17 +271,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         );
-                        if (result == null) {
-                          setState(() {
-                            _selectedContactNumbers.clear();
-                          });
-                        } else if (result is List<String>) {
-                          setState(() {
-                            _selectedContactNumbers.addAll(
-                              result.where((num) => !_selectedContactNumbers.contains(num)),
-                            );
-                          });
-                        }
+                        setState(() {
+                          _selectedContactNumbers = (result is List<String>) ? result : [];
+                        });
                       },
                     ),
                   ),
