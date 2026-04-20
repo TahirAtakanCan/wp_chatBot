@@ -12,7 +12,6 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
-  String? get sessionId => _currentUser?.sessionId;
   String? get token => _currentUser?.token;
 
   /// Uygulama açılışında kayıtlı oturumu kontrol eder.

@@ -71,7 +71,6 @@ class AuthService {
       jsonEncode({
         'token': auth.token,
         'role': auth.role,
-        'sessionId': auth.sessionId,
         'username': auth.username,
       }),
     );

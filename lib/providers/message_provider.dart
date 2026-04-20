@@ -13,8 +13,13 @@ class MessageProvider extends ChangeNotifier {
   // --- API Ayarları ---
   final String _baseUrl = AppConfig.apiSendUrl;
   final String _mediaApiUrl = AppConfig.apiMediaUrl;
-  String? _sessionId;
+  String? _sendJobId;
+  String? _rateLimitedSessionId;
   Timer? _pollingTimer;
+  bool _isResumingRateLimited = false;
+
+  String? get rateLimitedSessionId => _rateLimitedSessionId;
+  bool get isResumingRateLimited => _isResumingRateLimited;
 
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -23,19 +28,6 @@ class MessageProvider extends ChangeNotifier {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
-  }
-
-  // --- WhatsApp Session ---
-  String? _activeSessionId;
-  String? get activeSessionId => _activeSessionId;
-
-  void setActiveSession(String sessionId) {
-    _activeSessionId = sessionId;
-    phoneController.clear();
-    _phoneNumbers = [];
-    _lastLoadedFileName = null;
-    _originalFileNumbers = [];
-    notifyListeners();
   }
 
   // --- Kişi Listesi ---
@@ -454,6 +446,8 @@ class MessageProvider extends ChangeNotifier {
     }
 
     _status = SendingStatus.sending;
+    _rateLimitedSessionId = null;
+    _isResumingRateLimited = false;
     _sentCount = 0;
     _progress = 0.0;
     _logs.clear();
@@ -486,7 +480,6 @@ class MessageProvider extends ChangeNotifier {
             'minDelay': minDelay,
             'maxDelay': maxDelay,
             'media': [],
-            if (_activeSessionId != null) 'sessionId': _activeSessionId,
           };
 
           if (i == 0 && _selectedMediaUrls.isNotEmpty) {
@@ -508,8 +501,8 @@ class MessageProvider extends ChangeNotifier {
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-            _sessionId = data['sessionId'];
-            _addLog('[BAŞARILI] API Session ID: $_sessionId');
+            _sendJobId = data['sessionId'];
+            _addLog('[BAŞARILI] API Gönderim ID: $_sendJobId');
             _startPolling();
           } else {
             _status = SendingStatus.idle;
@@ -527,7 +520,6 @@ class MessageProvider extends ChangeNotifier {
           'minDelay': minDelay,
           'maxDelay': maxDelay,
           'media': [],
-          if (_activeSessionId != null) 'sessionId': _activeSessionId,
         };
         for (var url in _selectedMediaUrls) {
           (requestBody['media'] as List).add({
@@ -544,8 +536,8 @@ class MessageProvider extends ChangeNotifier {
         );
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          _sessionId = data['sessionId'];
-          _addLog('[BAŞARILI] API Session ID: $_sessionId');
+          _sendJobId = data['sessionId'];
+          _addLog('[BAŞARILI] API Gönderim ID: $_sendJobId');
           _startPolling();
         } else {
           _status = SendingStatus.idle;
@@ -568,11 +560,11 @@ class MessageProvider extends ChangeNotifier {
     _pollingTimer?.cancel();
     int lastBackendLogCount = 0;
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      if (_sessionId == null) return;
+      if (_sendJobId == null) return;
       try {
         final headers = await _getAuthHeaders();
         final response = await http.get(
-            Uri.parse('$_baseUrl/status/$_sessionId'),
+            Uri.parse('$_baseUrl/status/$_sendJobId'),
             headers: headers);
         if (response.statusCode == 200) {
           final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -594,7 +586,8 @@ class MessageProvider extends ChangeNotifier {
             _scrollToBottom();
           }
 
-          final String currentStatus = data['status'];
+          final currentStatus =
+              (data['status'] ?? '').toString().trim().toUpperCase();
           if (currentStatus == 'COMPLETED') {
             _status = SendingStatus.completed;
             _pollingTimer?.cancel();
@@ -604,6 +597,18 @@ class MessageProvider extends ChangeNotifier {
             _status = SendingStatus.idle;
             _pollingTimer?.cancel();
             _addLog('─── GÖNDERİM İPTAL OLDU ───');
+          } else if (currentStatus == 'RATE_LIMITED') {
+            _status = SendingStatus.rateLimited;
+            _pollingTimer?.cancel();
+            final backendSessionId = data['sessionId']?.toString();
+            _rateLimitedSessionId =
+                (backendSessionId != null && backendSessionId.isNotEmpty)
+                    ? backendSessionId
+                    : _sendJobId;
+            _addLog(
+                '[RATE_LIMIT] Meta API rate limit aşıldı. Gönderim durduruldu.');
+            _addLog(
+                '[UYARI] Sunucu yeniden başlatılmışsa gönderimi sıfırdan başlatmanız gerekebilir.');
           }
           notifyListeners();
         }
@@ -614,11 +619,11 @@ class MessageProvider extends ChangeNotifier {
   }
 
   Future<void> stopSending() async {
-    if (_status != SendingStatus.sending || _sessionId == null) return;
+    if (_status != SendingStatus.sending || _sendJobId == null) return;
     try {
       final headers = await _getAuthHeaders();
       final response = await http
-          .post(Uri.parse('$_baseUrl/stop/$_sessionId'), headers: headers);
+          .post(Uri.parse('$_baseUrl/stop/$_sendJobId'), headers: headers);
       if (response.statusCode == 200) {
         _pollingTimer?.cancel();
         _status = SendingStatus.paused;
@@ -632,7 +637,12 @@ class MessageProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> resumeSending() async {
+  Future<void> resumeSending({String? sessionId}) async {
+    if (sessionId != null && sessionId.trim().isNotEmpty) {
+      await _resumeRateLimited(sessionId.trim());
+      return;
+    }
+
     if (_status != SendingStatus.paused) return;
 
     parsePhoneNumbers();
@@ -670,7 +680,6 @@ class MessageProvider extends ChangeNotifier {
         'minDelay': minDelay,
         'maxDelay': maxDelay,
         'media': [],
-        if (_activeSessionId != null) 'sessionId': _activeSessionId,
       };
 
       if (_selectedMediaUrls.isNotEmpty) {
@@ -693,8 +702,9 @@ class MessageProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _sessionId = data['sessionId'];
-        _addLog('[BAŞARILI] Devam ediliyor - API Session ID: $_sessionId');
+        _sendJobId = data['sessionId'];
+        _rateLimitedSessionId = null;
+        _addLog('[BAŞARILI] Devam ediliyor - API Gönderim ID: $_sendJobId');
         _startPollingWithOffset(previousSent);
       } else {
         _status = SendingStatus.paused;
@@ -708,12 +718,70 @@ class MessageProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _resumeRateLimited(String sessionId) async {
+    if (_isResumingRateLimited) return;
+
+    final effectiveSessionId = sessionId.isNotEmpty
+        ? sessionId
+        : (_rateLimitedSessionId ?? _sendJobId);
+
+    if (effectiveSessionId == null || effectiveSessionId.isEmpty) {
+      _addLog(
+          '[HATA] Resume için session ID bulunamadı. Sunucu yeniden başlatılmış olabilir.');
+      notifyListeners();
+      return;
+    }
+
+    _isResumingRateLimited = true;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/resume/$effectiveSessionId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        String resumedId = effectiveSessionId;
+        if (response.body.isNotEmpty) {
+          try {
+            final data = jsonDecode(response.body) as Map<String, dynamic>;
+            final fromResponse = data['sessionId']?.toString();
+            if (fromResponse != null && fromResponse.isNotEmpty) {
+              resumedId = fromResponse;
+            }
+          } catch (_) {}
+        }
+
+        _sendJobId = resumedId;
+        _rateLimitedSessionId = resumedId;
+        _status = SendingStatus.sending;
+        _addLog(
+            '[BAŞARILI] RATE_LIMITED oturum devam ettirildi: $resumedId');
+        _startPolling();
+      } else {
+        _status = SendingStatus.rateLimited;
+        _addLog(
+            '[HATA] Resume isteği başarısız (${response.statusCode}): ${response.body}');
+      }
+    } catch (e) {
+      _status = SendingStatus.rateLimited;
+      _addLog('[HATA] Resume isteği sırasında bağlantı hatası: $e');
+    } finally {
+      _isResumingRateLimited = false;
+      notifyListeners();
+    }
+  }
+
   void resetState() {
     _pollingTimer?.cancel();
     _status = SendingStatus.idle;
     _sentCount = 0;
     _progress = 0.0;
-    _sessionId = null;
+    _sendJobId = null;
+    _rateLimitedSessionId = null;
+    _isResumingRateLimited = false;
     _logs.clear();
     _selectedMediaUrls.clear();
     _base64MediaList.clear();

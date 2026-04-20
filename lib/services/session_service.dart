@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
@@ -43,67 +42,26 @@ class SessionService {
     return [];
   }
 
-  /// Yeni session oluşturur
-  Future<bool> createSession(String sessionId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? '';
+  /// Meta API entegrasyon endpoint'ine erişim durumunu kontrol eder.
+  Future<bool> isIntegrationReachable() async {
+    final endpoints = [
+      '$_baseUrl/api/health',
+      '$_baseUrl/api/status',
+    ];
 
-      debugPrint('SESSION CREATE - Token: $token');
-      debugPrint('SESSION CREATE - SessionId: $sessionId');
-
-      final url = Uri.parse('$_baseUrl/api/session/create');
-      debugPrint('SESSION CREATE - URL: $url');
-
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'sessionId': sessionId}),
-      );
-
-      debugPrint('SESSION CREATE - Status: ${response.statusCode}');
-      debugPrint('SESSION CREATE - Body: ${response.body}');
-
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      debugPrint('SESSION CREATE - HATA: $e');
-      return false;
-    }
-  }
-
-  /// Belirtilen session'ı siler
-  Future<bool> deleteSession(String sessionId) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http
-          .delete(
-            Uri.parse('$_baseUrl/api/session/${Uri.encodeComponent(sessionId)}'),
-            headers: headers,
-          )
-          .timeout(const Duration(seconds: 5));
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// Session durumunu döndürür (qr, connected, user)
-  Future<Map<String, dynamic>> getSessionStatus(String sessionId) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/api/session/${Uri.encodeComponent(sessionId)}/status'),
-            headers: headers,
-          )
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+    for (final endpoint in endpoints) {
+      try {
+        final response = await http
+            .get(Uri.parse(endpoint))
+            .timeout(const Duration(seconds: 5));
+        if (response.statusCode == 200) {
+          return true;
+        }
+      } catch (_) {
+        // Sonraki endpoint denenir.
       }
-    } catch (_) {}
-    return {};
+    }
+
+    return false;
   }
 }

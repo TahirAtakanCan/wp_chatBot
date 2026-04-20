@@ -1,9 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ihh_project_chatbot/screens/contacts_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/message_provider.dart';
 import '../screens/session_management_screen.dart';
 import '../screens/templates_screen.dart';
 import '../screens/user_management_screen.dart';
@@ -13,8 +11,6 @@ import '../widgets/contact_list_panel.dart';
 import '../widgets/message_content_panel.dart';
 import '../widgets/action_panel.dart';
 import '../widgets/progress_log_panel.dart';
-import '../widgets/anti_spam_drawer.dart';
-import '../widgets/whatsapp_qr_connector.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,43 +21,56 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  Timer? _autoSelectTimer;
   List<String> _selectedContactNumbers = [];
+  bool? _metaApiConnected;
 
   @override
   void initState() {
     super.initState();
-    _tryAutoSelectSession();
+    _checkMetaApiConnection();
+  }
+
+  Future<void> _checkMetaApiConnection() async {
+    final token = context.read<AuthProvider>().token ?? '';
+    final reachable =
+        await SessionService(token: token).isIntegrationReachable();
+    if (!mounted) return;
+    setState(() {
+      _metaApiConnected = reachable;
+    });
   }
 
   @override
   void dispose() {
-    _autoSelectTimer?.cancel();
     super.dispose();
-  }
-
-  Future<void> _tryAutoSelectSession() async {
-    final provider = context.read<MessageProvider>();
-    if (provider.activeSessionId != null) return;
-
-    final token = context.read<AuthProvider>().token ?? '';
-    final sessions = await SessionService(token: token).getAllSessions();
-    final connected = sessions.where((s) => s.connected).toList();
-
-    if (connected.isNotEmpty) {
-      provider.setActiveSession(connected.first.sessionId);
-    } else {
-      // Bağlı session yoksa 3 saniye sonra tekrar dene
-      _autoSelectTimer?.cancel();
-      _autoSelectTimer = Timer(const Duration(seconds: 3), () {
-        if (mounted) _tryAutoSelectSession();
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final badgeColor = _metaApiConnected == null
+      ? const Color(0xFFFFF8E1)
+      : (_metaApiConnected == true
+        ? const Color(0xFFE8F5E9)
+        : const Color(0xFFFFEBEE));
+    final badgeBorder = _metaApiConnected == null
+      ? const Color(0xFFFFB300)
+      : (_metaApiConnected == true
+        ? const Color(0xFF4CAF50)
+        : const Color(0xFFE53935));
+    final badgeIcon = _metaApiConnected == null
+      ? Icons.sync
+      : (_metaApiConnected == true ? Icons.check_circle : Icons.error);
+    final badgeText = _metaApiConnected == null
+      ? 'Meta API kontrol ediliyor'
+      : (_metaApiConnected == true
+        ? 'Meta API Bağlı'
+        : 'Meta API Ulaşılamıyor');
+    final badgeTextColor = _metaApiConnected == null
+      ? const Color(0xFF7A5A00)
+      : (_metaApiConnected == true
+        ? const Color(0xFF2E7D32)
+        : const Color(0xFFC62828));
 
     return Scaffold(
       key: _scaffoldKey,
@@ -152,15 +161,18 @@ class _HomeScreenState extends State<HomeScreen> {
           // WhatsApp Hesap Yönetimi (sadece ADMIN)
           if (context.read<AuthProvider>().isAdmin)
             Tooltip(
-              message: 'WhatsApp Hesapları',
+              message: 'Entegrasyon Durumu',
               child: IconButton.filledTonal(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SessionManagementScreen(),
-                  ),
-                ),
-                icon: const Icon(Icons.phone_android, size: 22),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SessionManagementScreen(),
+                    ),
+                  );
+                  _checkMetaApiConnection();
+                },
+                icon: const Icon(Icons.monitor_heart_outlined, size: 22),
               ),
             ),
           const SizedBox(width: 8),
@@ -179,54 +191,33 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           const SizedBox(width: 8),
-          // WhatsApp bağlantı durumu
-          Consumer<MessageProvider>(
-            builder: (context, provider, _) {
-              final sessionId = provider.activeSessionId;
-              if (sessionId == null || sessionId.isEmpty) {
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF3E0),
-                    borderRadius: BorderRadius.circular(10),
-                    border:
-                        Border.all(color: const Color(0xFFFF9800), width: 1),
+          
+          // Meta API Bağlantı Durumu
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: badgeColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: badgeBorder, width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(badgeIcon, color: badgeTextColor, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  badgeText,
+                  style: TextStyle(
+                    color: badgeTextColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: Color(0xFFE65100), size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Hesap seçilmedi',
-                        style: TextStyle(
-                          color: Color(0xFFE65100),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return WhatsappQrConnector(
-                key: ValueKey(sessionId),
-                sessionId: sessionId,
-              );
-            },
-          ),
-          const SizedBox(width: 12),
-          // Anti-Spam Ayarları butonu
-          Tooltip(
-            message: 'Anti-Spam Ayarları',
-            child: IconButton.filledTonal(
-              onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-              icon: const Icon(Icons.shield_outlined, size: 22),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 4),
+          
+          const SizedBox(width: 12),
           // Çıkış butonu
           Tooltip(
             message: 'Çıkış Yap',
@@ -246,7 +237,6 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      endDrawer: const AntiSpamDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

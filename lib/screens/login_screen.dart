@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'home_screen.dart';
-import 'user_qr_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,15 +38,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _navigateByRole(AuthProvider auth) {
-    Widget destination;
-    if (auth.isAdmin) {
-      destination = const HomeScreen();
-    } else {
-      destination = UserQrScreen(sessionId: auth.sessionId ?? '');
-    }
-
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => destination),
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
       (_) => false,
     );
   }

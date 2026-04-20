@@ -34,6 +34,11 @@ class ProgressLogPanel extends StatelessWidget {
         statusColor = Colors.red;
         statusIcon = Icons.pause_circle;
         break;
+      case SendingStatus.rateLimited:
+        statusLabel = 'Rate Limit: Gönderim Durduruldu';
+        statusColor = Colors.deepOrange;
+        statusIcon = Icons.warning_amber_rounded;
+        break;
       case SendingStatus.completed:
         statusLabel = 'Tamamlandı';
         statusColor = Colors.green;
@@ -138,6 +143,76 @@ class ProgressLogPanel extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
+            if (provider.status == SendingStatus.rateLimited)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFFB74D)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: Color(0xFFE65100), size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Meta API rate limit aşıldı. Gönderim durduruldu.',
+                            style: TextStyle(
+                              color: Color(0xFFE65100),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Sunucu yeniden başlatılmışsa gönderimi sıfırdan başlatmanız gerekebilir.',
+                      style: TextStyle(
+                        color: Color(0xFF8D6E63),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: provider.isResumingRateLimited
+                          ? null
+                          : () => provider.resumeSending(
+                                sessionId: provider.rateLimitedSessionId ?? '',
+                              ),
+                      icon: provider.isResumingRateLimited
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.play_circle_outline_rounded,
+                              size: 18),
+                      label: Text(
+                        provider.isResumingRateLimited
+                            ? 'Devam Ettiriliyor...'
+                            : 'Kaldığı Yerden Devam Et',
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFE65100),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Log terminal kutusu
             Expanded(
               child: Container(
@@ -176,6 +251,9 @@ class ProgressLogPanel extends StatelessWidget {
                             logColor = Colors.lightBlueAccent;
                           } else if (log.contains('[DURDURULDU]')) {
                             logColor = Colors.orangeAccent;
+                          } else if (log.contains('[RATE_LIMIT]') ||
+                              log.contains('[UYARI]')) {
+                            logColor = Colors.deepOrangeAccent;
                           } else if (log.contains('───')) {
                             logColor = Colors.white;
                           }

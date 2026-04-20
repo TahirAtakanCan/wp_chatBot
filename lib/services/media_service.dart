@@ -11,13 +11,11 @@ class MediaService {
   /// [fileName]  : Dosya adı (uzantı tespiti için)
   /// [phone]     : Alıcı telefon numarası
   /// [caption]   : (Opsiyonel) Resim altı yazısı
-  /// [sessionId] : WhatsApp session ID
   static Future<({bool success, String message})> sendImage({
     required List<int> fileBytes,
     required String fileName,
     required String phone,
     String? caption,
-    required String sessionId,
   }) async {
     try {
       final base64Image = base64Encode(fileBytes);
@@ -46,7 +44,6 @@ class MediaService {
           'imageBase64': base64Image,
           'mimeType': mimeType,
           'caption': caption,
-          'sessionId': sessionId,
         }),
       );
 

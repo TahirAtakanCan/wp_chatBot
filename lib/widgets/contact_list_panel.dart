@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/message_provider.dart';
-import '../utils/phone_formatter.dart';
 
 class ContactListPanel extends StatefulWidget {
   final List<String>? rehberdenSecilenler;

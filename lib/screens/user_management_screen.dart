@@ -121,7 +121,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Future<void> _createUser(
     String username,
     String password,
-    String sessionId,
     String role,
   ) async {
     try {
@@ -130,9 +129,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         'password': password,
         'role': role,
       };
-      if (sessionId.isNotEmpty) {
-        body['sessionId'] = sessionId;
-      }
 
       final response = await http
           .post(
@@ -225,7 +221,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _showCreateDialog() {
     final usernameCtrl = TextEditingController();
     final passwordCtrl = TextEditingController();
-    final sessionCtrl = TextEditingController();
     String selectedRole = 'USER';
 
     showDialog(
@@ -252,14 +247,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   obscureText: true,
                   decoration: const InputDecoration(
                     labelText: 'Şifre',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: sessionCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Session ID',
-                    hintText: 'Örn: wp_ahmet',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -290,7 +277,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               onPressed: () {
                 final username = usernameCtrl.text.trim();
                 final password = passwordCtrl.text.trim();
-                final sessionId = sessionCtrl.text.trim();
                 if (username.isEmpty || password.isEmpty) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     const SnackBar(
@@ -300,7 +286,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   return;
                 }
                 Navigator.pop(ctx);
-                _createUser(username, password, sessionId, selectedRole);
+                _createUser(username, password, selectedRole);
               },
               child: const Text('Oluştur'),
             ),
@@ -379,7 +365,6 @@ class _UserCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final username = user['username'] ?? '-';
     final role = user['role'] ?? 'USER';
-    final sessionId = user['sessionId'];
     final isAdmin = role == 'ADMIN';
 
     return Card(
@@ -443,20 +428,6 @@ class _UserCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (sessionId != null &&
-                          sessionId.toString().isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Icon(Icons.link,
-                            size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 4),
-                        Text(
-                          sessionId.toString(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ],
