@@ -20,7 +20,9 @@ Future<http.Response> httpRequestWrap({
     await authProvider.logout();
 
     // Login ekranına yönlendir
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    if (context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    }
   }
 
   return response;

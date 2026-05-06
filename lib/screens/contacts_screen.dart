@@ -7,8 +7,7 @@ import '../providers/auth_provider.dart';
 
 class ContactsScreen extends StatefulWidget {
   final List<String> initiallySelectedNumbers;
-  const ContactsScreen({Key? key, this.initiallySelectedNumbers = const []})
-      : super(key: key);
+  const ContactsScreen({super.key, this.initiallySelectedNumbers = const []});
 
   @override
   State<ContactsScreen> createState() => _ContactsScreenState();
@@ -95,6 +94,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final contacts = await _contactService.getAllContacts(context, authProvider);
+      if (!mounted) return;
       setState(() {
         _contacts = contacts;
         _selectedContactIds = contacts
@@ -104,7 +104,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _filteredContacts = _applyFilters();
       });
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -175,10 +177,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
     );
     if (confirmed == true) {
+      if (!mounted) return;
       final authProvider = context.read<AuthProvider>();
       final success = await _contactService.deleteContact(context, authProvider, contact.id);
+      if (!mounted) return;
       if (success) {
         await _fetchContacts();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kişi silindi.')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kişi silinemedi.')));
@@ -209,10 +214,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
     );
     if (confirmed == true) {
+      if (!mounted) return;
       final authProvider = context.read<AuthProvider>();
       final success = await _contactService.deleteAllContacts(context, authProvider);
+      if (!mounted) return;
       if (success) {
         await _fetchContacts();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tüm rehber başarıyla silindi.')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rehber silinemedi.')));
@@ -225,6 +233,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final prefs = await SharedPreferences.getInstance();
     String? savedUrl = prefs.getString(_sheetsUrlKey);
     if (savedUrl != null && savedUrl.isNotEmpty) return savedUrl;
+    if (!mounted) return null;
 
     final controller = TextEditingController();
     final entered = await showDialog<String>(
@@ -258,6 +267,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _resetSheetUrl() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_sheetsUrlKey);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sheets URL sıfırlandı.')));
   }
@@ -265,6 +275,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _syncFromSheets() async {
     final sheetUrl = await _getOrAskSheetUrl();
     if (sheetUrl == null) return;
+    if (!mounted) return;
 
     setState(() => _syncing = true);
     try {
@@ -273,15 +284,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
       final imported = result['imported'] ?? 0;
       final skipped = result['skipped'] ?? 0;
       await _fetchContacts();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Güncellendi: $imported kişi eklendi, $skipped atlandı.')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Güncelleme başarısız. URL\'yi kontrol edin.')),
       );
     } finally {
-      setState(() => _syncing = false);
+      if (mounted) {
+        setState(() => _syncing = false);
+      }
     }
   }
 

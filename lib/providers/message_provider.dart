@@ -379,7 +379,7 @@ class MessageProvider extends ChangeNotifier {
   double _progress = 0.0;
   double get progress => _progress;
 
-  List<String> _logs = [];
+  final List<String> _logs = [];
   List<String> get logs => List.unmodifiable(_logs);
   final ScrollController logScrollController = ScrollController();
 
@@ -434,7 +434,7 @@ class MessageProvider extends ChangeNotifier {
   debugPrint('rawEntries: $rawEntries');
   debugPrint('phoneNumbers: $_phoneNumbers');
   debugPrint('isPersonalized: $_personalizedMessage');
-  debugPrint('messages: ${splitMessages}');
+  debugPrint('messages: $splitMessages');
 
     if (_phoneNumbers.isEmpty) {
       _addLog('[HATA] Gönderilecek telefon numarası bulunamadı.');

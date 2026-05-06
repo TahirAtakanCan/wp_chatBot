@@ -42,6 +42,43 @@ class SessionService {
     return [];
   }
 
+  /// Yeni bir session oluşturur.
+  Future<bool> createSession(String sessionId) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/sessions'),
+            headers: headers,
+            body: jsonEncode({'sessionId': sessionId}),
+          )
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Tek bir session'ın durum bilgisini döndürür.
+  Future<SessionModel?> getSessionStatus(String sessionId) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/api/sessions/$sessionId'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final sessionJson =
+            (data['session'] as Map<String, dynamic>?) ?? data;
+        return SessionModel.fromJson(sessionJson);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Meta API entegrasyon endpoint'ine erişim durumunu kontrol eder.
   Future<bool> isIntegrationReachable() async {
     final endpoints = [

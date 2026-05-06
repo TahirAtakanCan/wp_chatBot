@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
@@ -11,9 +12,10 @@ class AuthService {
   /// Login isteği gönderir, başarılıysa AuthModel döner.
   static Future<AuthModel?> login(String username, String password) async {
     try {
+      final uri = Uri.parse('${AppConfig.apiAuthUrl}/login');
       final response = await http
           .post(
-            Uri.parse('${AppConfig.baseHost}/api/auth/login'),
+            uri,
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'username': username,
@@ -23,12 +25,30 @@ class AuthService {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final decoded = jsonDecode(response.body);
+        if (decoded is! Map<String, dynamic>) {
+          debugPrint('[AuthService] Beklenmeyen login response: ${response.body}');
+          return null;
+        }
+
+        final data = Map<String, dynamic>.from(decoded);
+        // Bazı backend cevaplarında username/role gelmeyebilir.
+        data.putIfAbsent('username', () => username.trim());
+
         final auth = AuthModel.fromJson(data);
+        if (auth.token.isEmpty) {
+          debugPrint('[AuthService] Login 200 ama token boş.');
+          return null;
+        }
         await _saveAuth(auth);
         return auth;
       }
-    } catch (_) {}
+      debugPrint(
+        '[AuthService] Login başarısız (${response.statusCode}): ${response.body}',
+      );
+    } catch (e) {
+      debugPrint('[AuthService] Login exception: $e');
+    }
     return null;
   }
 
@@ -72,6 +92,7 @@ class AuthService {
         'token': auth.token,
         'role': auth.role,
         'username': auth.username,
+        'sessionId': auth.sessionId,
       }),
     );
   }

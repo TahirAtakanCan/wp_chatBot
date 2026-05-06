@@ -15,17 +15,19 @@ class ContactService {
   }
 
   Future<List<ContactModel>> getAllContacts(BuildContext context, AuthProvider authProvider) async {
-    final token = await _getToken();
     final response = await httpRequestWrap(
       context: context,
       authProvider: authProvider,
-      request: () => http.get(
-        Uri.parse('$_baseUrl/api/contacts'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ),
+      request: () async {
+        final token = await _getToken();
+        return http.get(
+          Uri.parse('$_baseUrl/api/contacts'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+      },
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
@@ -36,49 +38,55 @@ class ContactService {
   }
 
   Future<bool> deleteContact(BuildContext context, AuthProvider authProvider, int id) async {
-    final token = await _getToken();
     final response = await httpRequestWrap(
       context: context,
       authProvider: authProvider,
-      request: () => http.delete(
-        Uri.parse('$_baseUrl/api/contacts/$id'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ),
+      request: () async {
+        final token = await _getToken();
+        return http.delete(
+          Uri.parse('$_baseUrl/api/contacts/$id'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+      },
     );
     return response.statusCode == 200;
   }
 
   Future<bool> deleteAllContacts(BuildContext context, AuthProvider authProvider) async {
-    final token = await _getToken();
     final response = await httpRequestWrap(
       context: context,
       authProvider: authProvider,
-      request: () => http.delete(
-        Uri.parse('$_baseUrl/api/contacts/all'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ),
+      request: () async {
+        final token = await _getToken();
+        return http.delete(
+          Uri.parse('$_baseUrl/api/contacts/all'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+      },
     );
     return response.statusCode == 200;
   }
 
   Future<List<ContactModel>> searchContacts(BuildContext context, AuthProvider authProvider, String query) async {
-    final token = await _getToken();
     final response = await httpRequestWrap(
       context: context,
       authProvider: authProvider,
-      request: () => http.get(
-        Uri.parse('$_baseUrl/api/contacts/search?q=$query'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ),
+      request: () async {
+        final token = await _getToken();
+        return http.get(
+          Uri.parse('$_baseUrl/api/contacts/search?q=$query'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+      },
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
@@ -91,18 +99,20 @@ class ContactService {
   /// Google Sheets URL'sinden rehberi günceller.
   /// Döner: { "imported": int, "skipped": int }
   Future<Map<String, dynamic>> syncFromGoogleSheets(BuildContext context, AuthProvider authProvider, String sheetUrl) async {
-    final token = await _getToken();
     final response = await httpRequestWrap(
       context: context,
       authProvider: authProvider,
-      request: () => http.post(
-        Uri.parse('$_baseUrl/api/contacts/sync-sheets'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'sheetUrl': sheetUrl}),
-      ),
+      request: () async {
+        final token = await _getToken();
+        return http.post(
+          Uri.parse('$_baseUrl/api/contacts/sync-sheets'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'sheetUrl': sheetUrl}),
+        );
+      },
     );
     if (response.statusCode == 200) {
       return json.decode(response.body) as Map<String, dynamic>;

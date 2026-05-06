@@ -5,9 +5,11 @@ import '../providers/message_provider.dart';
 class ContactListPanel extends StatefulWidget {
   final List<String>? rehberdenSecilenler;
   final VoidCallback? onRehberdenSec;
-  const ContactListPanel(
-      {Key? key, this.rehberdenSecilenler, this.onRehberdenSec})
-      : super(key: key);
+  const ContactListPanel({
+    super.key,
+    this.rehberdenSecilenler,
+    this.onRehberdenSec,
+  });
 
   @override
   State<ContactListPanel> createState() => _ContactListPanelState();

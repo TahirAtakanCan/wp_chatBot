@@ -1,13 +1,19 @@
-/// Lokal/Canlı ortam geçişi için tek şalter.
-/// [isLocal] = true  → localhost'a bağlanır (geliştirme)
-/// [isLocal] = false → uzak sunucuya bağlanır (canlı)
+/// Backend adresi dart-define ile verilir.
+/// Ornek:
+/// --dart-define=BACKEND_HOST=127.0.0.1
+/// --dart-define=BACKEND_PORT=8080
 class AppConfig {
-  static const bool isLocal = false;
+  static const String _scheme =
+      String.fromEnvironment('BACKEND_SCHEME', defaultValue: 'http');
+  static const String _host =
+      String.fromEnvironment('BACKEND_HOST', defaultValue: 'localhost');
+  static const String _port =
+      String.fromEnvironment('BACKEND_PORT', defaultValue: '8080');
 
-  static const String _localHost = 'http://127.0.0.1:8080';
-  static const String _remoteHost = 'http://94.130.231.165:8080';
+  static String get baseHost {
+    return _port.isEmpty ? '$_scheme://$_host' : '$_scheme://$_host:$_port';
+  }
 
-  static String get baseHost => isLocal ? _localHost : _remoteHost;
   static String get apiSendUrl => '$baseHost/api/send';
   static String get apiMediaUrl => '$baseHost/api/media';
   static String get apiAuthUrl => '$baseHost/api/auth';
