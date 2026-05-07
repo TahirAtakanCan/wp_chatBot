@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../screens/session_management_screen.dart';
 import '../screens/templates_screen.dart';
 import '../screens/user_management_screen.dart';
+import '../screens/inbox_screen.dart';
 import '../screens/login_screen.dart';
 import '../services/session_service.dart';
 import '../widgets/contact_list_panel.dart';
@@ -142,6 +143,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
               },
               icon: const Icon(Icons.contacts, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Gelen Kutusu',
+            child: IconButton.filledTonal(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const InboxScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.inbox_outlined, size: 22),
             ),
           ),
           const SizedBox(width: 8),
