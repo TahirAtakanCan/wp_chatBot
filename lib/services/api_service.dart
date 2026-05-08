@@ -24,6 +24,10 @@ class ApiService {
     return _conversationService.sendReply(conversationId, text);
   }
 
+  Future<Message> sendContactCard(int conversationId) {
+    return _conversationService.sendContactCard(conversationId);
+  }
+
   Future<Conversation> closeConversation(int conversationId) {
     return _conversationService.closeConversation(conversationId);
   }

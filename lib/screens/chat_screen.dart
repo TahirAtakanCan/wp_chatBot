@@ -50,6 +50,29 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.conversation.id != widget.conversation.id) {
+      _pollingTimer?.cancel();
+      _pollingTimer = null;
+      _conversation = widget.conversation;
+
+      setState(() {
+        _messages.clear();
+        _isLoading = true;
+        _isSending = false;
+      });
+
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+
+      _loadMessages();
+      _startPolling();
+    }
+  }
+
+  @override
   void dispose() {
     _pollingTimer?.cancel();
     _scrollController.dispose();
@@ -180,6 +203,88 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       _markMessageFailed(tempMessage.id);
       _showSnackBar('Gönderilemedi: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmSendContactCard() async {
+    if (_conversation == null || !mounted) return;
+
+    final shouldSend = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kişi kartı gönderimi'),
+        content: const Text(
+          'İHH Seydişehir kişi kartını göndermek istiyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Gönder'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSend == true) {
+      await _sendContactCard();
+    }
+  }
+
+  Future<void> _sendContactCard() async {
+    if (_conversation == null || _isSending) return;
+
+    final tempMessage = Message(
+      id: -1,
+      direction: 'OUTBOUND',
+      messageType: 'TEXT',
+      content: '📇 Kişi Kartı Gönderildi',
+      waMessageId: null,
+      sentAt: DateTime.now(),
+      status: 'PENDING',
+    );
+
+    setState(() {
+      _isSending = true;
+      _messages = <Message>[..._messages, tempMessage];
+      _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    });
+
+    _scrollToBottom();
+
+    try {
+      final sent = await _apiService.sendContactCard(_conversation!.id);
+      if (!mounted) return;
+
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == tempMessage.id);
+        if (idx >= 0) {
+          _messages[idx] = sent;
+        } else {
+          _messages = <Message>[..._messages, sent];
+        }
+        _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      });
+
+      _scrollToBottom();
+    } on ReplyWindowClosedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('24 saat penceresi kapalı');
+    } on RateLimitedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Hız limiti, biraz sonra deneyin');
+    } catch (_) {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Kişi kartı gönderilemedi');
     } finally {
       if (mounted) {
         setState(() {
@@ -348,6 +453,9 @@ class _ChatScreenState extends State<ChatScreen> {
               if (value == 'close') {
                 _closeConversation();
               }
+              if (value == 'contact_card') {
+                _confirmSendContactCard();
+              }
               if (value == 'info') {
                 _showSnackBar('Yakında: bilgiler');
               }
@@ -356,6 +464,10 @@ class _ChatScreenState extends State<ChatScreen> {
               PopupMenuItem<String>(
                 value: 'close',
                 child: Text('Konuşmayı Kapat'),
+              ),
+              PopupMenuItem<String>(
+                value: 'contact_card',
+                child: Text('Kişi Kartı Gönder'),
               ),
               PopupMenuItem<String>(
                 value: 'info',
@@ -522,6 +634,9 @@ class _ChatScreenState extends State<ChatScreen> {
           if (value == 'close') {
             _closeConversation();
           }
+          if (value == 'contact_card') {
+            _confirmSendContactCard();
+          }
           if (value == 'info') {
             _showSnackBar('Yakında: bilgiler');
           }
@@ -530,6 +645,10 @@ class _ChatScreenState extends State<ChatScreen> {
           PopupMenuItem<String>(
             value: 'close',
             child: Text('Konuşmayı Kapat'),
+          ),
+          PopupMenuItem<String>(
+            value: 'contact_card',
+            child: Text('Kişi Kartı Gönder'),
           ),
           PopupMenuItem<String>(
             value: 'info',

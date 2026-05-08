@@ -101,6 +101,37 @@ class ConversationService {
     );
   }
 
+  Future<Message> sendContactCard(int conversationId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/conversations/$conversationId/send-contact-card'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      return Message.fromJson(decoded);
+    }
+
+    if (response.statusCode == 422) {
+      throw ReplyWindowClosedException(
+        'Yanit penceresi kapali',
+        statusCode: response.statusCode,
+      );
+    }
+
+    if (response.statusCode == 429) {
+      throw RateLimitedException(
+        'Cok fazla istek gonderildi',
+        statusCode: response.statusCode,
+      );
+    }
+
+    throw ApiException(
+      'Kişi kartı gönderilemedi',
+      statusCode: response.statusCode,
+    );
+  }
+
   Future<Conversation> closeConversation(int conversationId) async {
     final response = await http.put(
       Uri.parse('$_baseUrl/api/conversations/$conversationId/close'),
