@@ -6,13 +6,23 @@ import '../models/conversation.dart';
 import '../models/message.dart';
 import '../services/api_exceptions.dart';
 import '../services/api_service.dart';
+import '../theme/wa_colors.dart';
+import '../theme/wa_text_styles.dart';
+import '../widgets/avatar.dart';
+import '../widgets/chat_composer.dart';
+import '../widgets/date_separator.dart';
+import '../widgets/message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
+  final bool embedded;
+  final ValueChanged<Conversation>? onConversationUpdated;
 
   const ChatScreen({
     super.key,
     required this.conversation,
+    this.embedded = false,
+    this.onConversationUpdated,
   });
 
   @override
@@ -209,6 +219,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _conversation = updated;
       });
 
+      widget.onConversationUpdated?.call(updated);
+
       _showSnackBar('Konuşma kapatıldı');
     } catch (e) {
       _showSnackBar('Konuşma kapatılamadı: $e');
@@ -243,6 +255,28 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
+    if (widget.embedded) {
+      return Container(
+        color: WAColors.chatPanelBg,
+        child: Column(
+          children: [
+            _buildEmbeddedHeader(conversation),
+            Expanded(child: _buildMessageList()),
+            ChatComposer(
+              enabled: conversation.replyWindowOpen,
+              controller: _replyController,
+              focusNode: _replyFocusNode,
+              isSending: _isSending,
+              onSend: _sendReply,
+              onTemplatePressed: () {
+                _showSnackBar('Yakında: template gönderimi');
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
     return PopScope<Conversation>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -250,56 +284,86 @@ class _ChatScreenState extends State<ChatScreen> {
         Navigator.of(context).pop(_conversation);
       },
       child: Scaffold(
+        backgroundColor: WAColors.chatPanelBg,
         appBar: AppBar(
+          backgroundColor: WAColors.leftPanelHeader,
+          toolbarHeight: 60,
           leading: IconButton(
             onPressed: () => Navigator.of(context).pop(conversation),
             icon: const Icon(Icons.arrow_back),
           ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(conversation.displayName),
-              Text(
-                conversation.replyWindowOpen
-                    ? 'Aktif'
-                    : '24 saat penceresi kapalı',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          actions: [
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'close') {
-                  _closeConversation();
-                }
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem<String>(
-                  value: 'close',
-                  child: Text('Konuşmayı Kapat'),
-                ),
-              ],
-            ),
-          ],
+          titleSpacing: 0,
+          title: _buildHeaderContent(conversation),
+          actions: _buildHeaderActions(),
         ),
         body: Column(
           children: [
             Expanded(
               child: _buildMessageList(),
             ),
-            ReplyComposer(
+            ChatComposer(
               enabled: conversation.replyWindowOpen,
               controller: _replyController,
               focusNode: _replyFocusNode,
               isSending: _isSending,
               onSend: _sendReply,
               onTemplatePressed: () {
-                _showSnackBar('Yakında');
+                _showSnackBar('Yakında: template gönderimi');
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmbeddedHeader(Conversation conversation) {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: WAColors.leftPanelHeader,
+        border: Border(
+          bottom: BorderSide(color: WAColors.divider),
+        ),
+      ),
+      child: Row(
+        children: [
+          Avatar(
+            name: conversation.contactName,
+            phoneNumber: conversation.phoneNumber,
+            radius: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: _buildHeaderTitle(conversation)),
+          IconButton(
+            tooltip: 'Ara',
+            onPressed: () => _showSnackBar('Yakında: mesaj arama'),
+            icon: const Icon(Icons.search, size: 24),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            splashRadius: 20,
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'close') {
+                _closeConversation();
+              }
+              if (value == 'info') {
+                _showSnackBar('Yakında: bilgiler');
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'close',
+                child: Text('Konuşmayı Kapat'),
+              ),
+              PopupMenuItem<String>(
+                value: 'info',
+                child: Text('Bilgileri görüntüle'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -307,236 +371,219 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageList() {
     if (_isLoading && _messages.isEmpty) {
       return const Center(
-        child: Text('Mesajlar yükleniyor...'),
+        child: CircularProgressIndicator(),
       );
     }
 
     if (_messages.isEmpty) {
       return const Center(
-        child: Text('Henüz mesaj yok'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 40,
+              color: WAColors.textTertiary,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Henüz mesaj yok',
+              style: WATextStyles.emptySubtitle,
+            ),
+          ],
+        ),
       );
     }
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      reverse: false,
-      itemCount: _messages.length,
-      itemBuilder: (context, index) {
-        final message = _messages[index];
-        return MessageBubble(
-          message: message,
-          onRetry: message.status.toUpperCase() == 'FAILED'
-              ? () {
-                  final content = message.content?.trim() ?? '';
-                  if (content.isEmpty) return;
-                  _sendText(content, replaceMessageId: message.id);
-                }
-              : null,
+    final items = _buildMessageItems(_messages);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final horizontalPadding = width >= 1024
+            ? 64.0
+            : (width >= 768 ? 24.0 : 16.0);
+
+        return ListView.builder(
+          controller: _scrollController,
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            12,
+            horizontalPadding,
+            12,
+          ),
+          reverse: false,
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            if (item.isSeparator) {
+              return DateSeparator(dateTime: item.dateTime!);
+            }
+
+            final message = item.message!;
+            final previous = _previousMessage(items, index);
+            final prevWasSeparator = _previousWasSeparator(items, index);
+            final isFirstInGroup = previous == null ||
+                previous.direction != message.direction ||
+                prevWasSeparator;
+
+            double topSpacing = 4;
+            if (previous != null) {
+              if (prevWasSeparator) {
+                topSpacing = 4;
+              } else if (previous.direction == message.direction) {
+                topSpacing = 2;
+              } else {
+                topSpacing = 8;
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(top: topSpacing),
+              child: MessageBubble(
+                message: message,
+                isFirstInGroup: isFirstInGroup,
+                onImageTap: message.messageType.toUpperCase() == 'IMAGE'
+                    ? () => _showSnackBar('Yakında: medya görüntüleme')
+                    : null,
+                onRetry: message.status.toUpperCase() == 'FAILED'
+                    ? () {
+                        final content = message.content?.trim() ?? '';
+                        if (content.isEmpty) return;
+                        _sendText(content, replaceMessageId: message.id);
+                      }
+                    : null,
+              ),
+            );
+          },
         );
       },
     );
   }
-}
 
-class MessageBubble extends StatelessWidget {
-  final Message message;
-  final VoidCallback? onRetry;
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 
-  const MessageBubble({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isInbound = message.isInbound;
-    final alignment =
-        isInbound ? Alignment.centerLeft : Alignment.centerRight;
-    final background = isInbound ? Colors.grey.shade100 : const Color(0xFFDCF8C6);
-
-    return Align(
-      alignment: alignment,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+  Widget _buildHeaderContent(Conversation conversation) {
+    return Row(
+      children: [
+        Avatar(
+          name: conversation.contactName,
+          phoneNumber: conversation.phoneNumber,
+          radius: 20,
         ),
-        child: Card(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          elevation: 0,
-          color: background,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildContent(),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    Text(
-                      _formatHourMinute(message.sentAt),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    if (message.isOutbound) ...[
-                      const SizedBox(width: 4),
-                      _buildStatusIcon(message.status),
-                    ],
-                  ],
-                ),
-                if (message.status.toUpperCase() == 'FAILED' && onRetry != null)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: onRetry,
-                      child: const Text('Tekrar gönder'),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(child: _buildHeaderTitle(conversation)),
+      ],
     );
   }
 
-  Widget _buildContent() {
-    final messageType = message.messageType.toUpperCase();
-    if (messageType == 'IMAGE') {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.image_outlined, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            '[Resim] ${message.content ?? ''}'.trim(),
-            style: const TextStyle(fontSize: 15),
-          ),
-        ],
-      );
-    }
+  Widget _buildHeaderTitle(Conversation conversation) {
+    final isActive = conversation.replyWindowOpen;
+    final dotColor = isActive ? WAColors.accent : WAColors.warningYellow;
+    final statusText = isActive ? 'Aktif' : '24 saat penceresi kapalı';
 
-    return Text(
-      (message.content ?? '').trim(),
-      style: const TextStyle(fontSize: 15),
-    );
-  }
-
-  Widget _buildStatusIcon(String statusRaw) {
-    final status = statusRaw.trim().toUpperCase();
-    switch (status) {
-      case 'PENDING':
-        return const Icon(Icons.schedule, size: 14, color: Colors.grey);
-      case 'SENT':
-        return const Icon(Icons.check, size: 15, color: Colors.grey);
-      case 'DELIVERED':
-        return const Icon(Icons.done_all, size: 15, color: Colors.grey);
-      case 'READ':
-        return const Icon(Icons.done_all, size: 15, color: Colors.blue);
-      case 'FAILED':
-        return const Icon(Icons.error_outline, size: 15, color: Colors.red);
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  String _formatHourMinute(DateTime dt) {
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
-}
-
-class ReplyComposer extends StatelessWidget {
-  final bool enabled;
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool isSending;
-  final Future<void> Function() onSend;
-  final VoidCallback onTemplatePressed;
-
-  const ReplyComposer({
-    super.key,
-    required this.enabled,
-    required this.controller,
-    required this.focusNode,
-    required this.isSending,
-    required this.onSend,
-    required this.onTemplatePressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade200),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!enabled)
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(conversation.displayName, style: WATextStyles.chatTitle),
+        const SizedBox(height: 4),
+        Row(
+          children: [
             Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(10),
+              width: 8,
+              height: 8,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFFE082)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '⚠️ Bu kişiye 24 saatten fazladır mesaj gönderilmemiş. Sadece onaylı template ile iletişim kurabilirsiniz.',
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: onTemplatePressed,
-                    child: const Text('Template Gönder'),
-                  ),
-                ],
+                color: dotColor,
+                shape: BoxShape.circle,
               ),
             ),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  enabled: enabled && !isSending,
-                  textInputAction: TextInputAction.send,
-                  minLines: 1,
-                  maxLines: 4,
-                  onSubmitted: (_) {
-                    if (enabled && !isSending) {
-                      onSend();
-                    }
-                  },
-                  decoration: const InputDecoration(
-                    hintText: 'Mesaj yaz...',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                onPressed: (enabled && !isSending) ? onSend : null,
-                icon: const Icon(Icons.send),
-              ),
-            ],
+            const SizedBox(width: 6),
+            Text(statusText, style: WATextStyles.chatSubtitle),
+          ],
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildHeaderActions() {
+    return [
+      IconButton(
+        tooltip: 'Ara',
+        onPressed: () => _showSnackBar('Yakında: mesaj arama'),
+        icon: const Icon(Icons.search, size: 24),
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+        splashRadius: 20,
+      ),
+      PopupMenuButton<String>(
+        onSelected: (value) {
+          if (value == 'close') {
+            _closeConversation();
+          }
+          if (value == 'info') {
+            _showSnackBar('Yakında: bilgiler');
+          }
+        },
+        itemBuilder: (context) => const [
+          PopupMenuItem<String>(
+            value: 'close',
+            child: Text('Konuşmayı Kapat'),
+          ),
+          PopupMenuItem<String>(
+            value: 'info',
+            child: Text('Bilgileri görüntüle'),
           ),
         ],
       ),
-    );
+    ];
   }
+
+  List<_ChatListItem> _buildMessageItems(List<Message> messages) {
+    final items = <_ChatListItem>[];
+    DateTime? lastDate;
+
+    for (final msg in messages) {
+      final msgDate = DateTime(msg.sentAt.year, msg.sentAt.month, msg.sentAt.day);
+      if (lastDate == null || !_isSameDay(msgDate, lastDate)) {
+        items.add(_ChatListItem.separator(msgDate));
+        lastDate = msgDate;
+      }
+      items.add(_ChatListItem.message(msg));
+    }
+
+    return items;
+  }
+
+  Message? _previousMessage(List<_ChatListItem> items, int index) {
+    for (var i = index - 1; i >= 0; i--) {
+      final item = items[i];
+      if (!item.isSeparator) return item.message;
+    }
+    return null;
+  }
+
+  bool _previousWasSeparator(List<_ChatListItem> items, int index) {
+    if (index <= 0) return false;
+    return items[index - 1].isSeparator;
+  }
+}
+
+class _ChatListItem {
+  final Message? message;
+  final DateTime? dateTime;
+  final bool isSeparator;
+
+  const _ChatListItem._({
+    this.message,
+    this.dateTime,
+    required this.isSeparator,
+  });
+
+  factory _ChatListItem.message(Message message) =>
+      _ChatListItem._(message: message, isSeparator: false);
+
+  factory _ChatListItem.separator(DateTime dateTime) =>
+      _ChatListItem._(dateTime: dateTime, isSeparator: true);
 }

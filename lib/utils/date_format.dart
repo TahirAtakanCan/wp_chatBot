@@ -32,3 +32,54 @@ String formatTime(DateTime dt) {
   final year = dt.year.toString();
   return '$day.$month.$year';
 }
+
+String formatDateChip(DateTime dt) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final targetDay = DateTime(dt.year, dt.month, dt.day);
+  final differenceInDays = today.difference(targetDay).inDays;
+
+  if (differenceInDays == 0) {
+    return 'BUGÜN';
+  }
+
+  if (differenceInDays == 1) {
+    return 'DÜN';
+  }
+
+  if (differenceInDays > 1 && differenceInDays < 7) {
+    const weekDays = <int, String>{
+      DateTime.monday: 'PAZARTESİ',
+      DateTime.tuesday: 'SALI',
+      DateTime.wednesday: 'ÇARŞAMBA',
+      DateTime.thursday: 'PERŞEMBE',
+      DateTime.friday: 'CUMA',
+      DateTime.saturday: 'CUMARTESİ',
+      DateTime.sunday: 'PAZAR',
+    };
+    return weekDays[dt.weekday] ?? '';
+  }
+
+  const months = <int, String>{
+    1: 'OCAK',
+    2: 'ŞUBAT',
+    3: 'MART',
+    4: 'NİSAN',
+    5: 'MAYIS',
+    6: 'HAZİRAN',
+    7: 'TEMMUZ',
+    8: 'AĞUSTOS',
+    9: 'EYLÜL',
+    10: 'EKİM',
+    11: 'KASIM',
+    12: 'ARALIK',
+  };
+
+  final day = dt.day.toString().padLeft(2, '0');
+  final monthName = months[dt.month] ?? '';
+  if (dt.year == now.year) {
+    return '$day $monthName';
+  }
+
+  return '$day $monthName ${dt.year}';
+}

@@ -1,14 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/conversation.dart';
 import '../services/api_service.dart';
-import '../utils/date_format.dart';
+import '../theme/wa_colors.dart';
+import '../theme/wa_text_styles.dart';
+import '../widgets/conversation_tile.dart';
 import 'chat_screen.dart';
 
 class InboxScreen extends StatefulWidget {
-  const InboxScreen({super.key});
+  final ValueChanged<Conversation>? onConversationSelected;
+  final Conversation? selectedConversation;
+  final bool showAppBar;
+
+  const InboxScreen({
+    super.key,
+    this.onConversationSelected,
+    this.selectedConversation,
+    this.showAppBar = true,
+  });
 
   @override
   State<InboxScreen> createState() => _InboxScreenState();
@@ -16,9 +28,13 @@ class InboxScreen extends StatefulWidget {
 
 class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
+  final FocusNode _listFocusNode = FocusNode();
   Timer? _pollingTimer;
 
   List<Conversation> _conversations = <Conversation>[];
+  String _searchQuery = '';
+  _InboxFilter _activeFilter = _InboxFilter.all;
+  int? _focusedIndex;
   bool _isLoading = true;
   bool _isRequestInFlight = false;
   String? _errorMessage;
@@ -32,9 +48,22 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   }
 
   @override
+  void didUpdateWidget(covariant InboxScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final updated = widget.selectedConversation;
+    if (updated == null) return;
+    final idx = _conversations.indexWhere((c) => c.id == updated.id);
+    if (idx < 0) return;
+    setState(() {
+      _conversations[idx] = updated;
+    });
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopPolling();
+    _listFocusNode.dispose();
     super.dispose();
   }
 
@@ -100,205 +129,472 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final content = Column(
+      children: [
+        _buildSearchBar(),
+        _buildFilters(),
+        const Divider(height: 1, color: WAColors.divider),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => _loadConversations(silent: true),
+            child: _buildBody(),
+          ),
+        ),
+      ],
+    );
+
+    if (!widget.showAppBar) {
+      return Container(
+        color: WAColors.leftPanelBg,
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(child: content),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gelen Kutusu'),
-        actions: [
+      backgroundColor: WAColors.leftPanelBg,
+      appBar: _buildAppBarHeader(),
+      body: content,
+    );
+  }
+
+  PreferredSizeWidget _buildAppBarHeader() {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(60),
+      child: _buildHeader(),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: WAColors.leftPanelHeader,
+        border: Border(
+          bottom: BorderSide(color: WAColors.divider),
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: WAColors.accent,
+            child: const Text(
+              'U',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const Spacer(),
           IconButton(
-            tooltip: 'Yenile',
-            onPressed: () => _loadConversations(),
-            icon: const Icon(Icons.refresh),
+            tooltip: 'Filtrele',
+            onPressed: () {},
+            icon: const Icon(Icons.tune, size: 24),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            splashRadius: 20,
+          ),
+          IconButton(
+            tooltip: 'Yeni konuşma',
+            onPressed: () {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(
+                    content: Text('Yakında: yeni konuşma başlatma'),
+                  ),
+                );
+            },
+            icon: const Icon(Icons.chat, size: 24),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            splashRadius: 20,
+          ),
+          IconButton(
+            tooltip: 'Menü',
+            onPressed: () {},
+            icon: const Icon(Icons.more_vert, size: 24),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            splashRadius: 20,
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () => _loadConversations(silent: true),
-        child: _buildBody(),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: SizedBox(
+        height: 40,
+        child: TextField(
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value.trim();
+            });
+          },
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: WAColors.inputBg,
+            hintText: 'Konuşma ara...',
+            prefixIcon: const Icon(Icons.search, color: WAColors.textTertiary),
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilters() {
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        children: [
+          _buildFilterChip('Tümü', _InboxFilter.all),
+          const SizedBox(width: 8),
+          _buildFilterChip('Okunmamış', _InboxFilter.unread),
+          const SizedBox(width: 8),
+          _buildFilterChip('Aktif', _InboxFilter.active),
+          const SizedBox(width: 8),
+          _buildFilterChip('Kapalı', _InboxFilter.closed),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, _InboxFilter filter) {
+    final isSelected = _activeFilter == filter;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        setState(() {
+          _activeFilter = filter;
+        });
+      },
+      child: Container(
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? WAColors.accent : WAColors.composerBg,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : WAColors.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const _LoadingSkeleton();
     }
 
     if (_errorMessage != null) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(
-            height: 420,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: () => _loadConversations(),
-                      child: const Text('Tekrar Dene'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
+      return _buildErrorState(_errorMessage!);
     }
 
     if (_conversations.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(
-            height: 420,
-            child: Center(
-              child: Text('Henüz konuşma yok'),
-            ),
-          ),
-        ],
-      );
+      return _buildEmptyState();
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _conversations.length,
-      itemBuilder: (context, index) {
-        final conversation = _conversations[index];
-        return ConversationTile(
-          conversation: conversation,
-          onTap: () async {
-            final updated = await Navigator.push<Conversation>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatScreen(
-                  conversation: conversation,
-                ),
-              ),
+    final filtered = _applyFilters();
+    if (filtered.isEmpty) {
+      return _buildNoResults();
+    }
+
+    return Focus(
+      focusNode: _listFocusNode,
+      onKeyEvent: (_, event) => _handleListKeyEvent(event, filtered),
+      child: GestureDetector(
+        onTap: () => _listFocusNode.requestFocus(),
+        behavior: HitTestBehavior.translucent,
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final conversation = filtered[index];
+            return ConversationTile(
+              conversation: conversation,
+              isSelected: widget.selectedConversation?.id == conversation.id,
+              onTap: () => _openConversation(conversation),
             );
-
-            if (!context.mounted || updated == null) return;
-
-            final idx = _conversations.indexWhere((c) => c.id == updated.id);
-            if (idx < 0) return;
-            setState(() {
-              _conversations[idx] = updated;
-            });
           },
-        );
-      },
-    );
-  }
-}
-
-class ConversationTile extends StatelessWidget {
-  final Conversation conversation;
-  final VoidCallback onTap;
-
-  const ConversationTile({
-    super.key,
-    required this.conversation,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isClosed = conversation.status.toUpperCase() == 'CLOSED';
-    final theme = Theme.of(context);
-
-    return Opacity(
-      opacity: isClosed ? 0.55 : 1,
-      child: ListTile(
-        onTap: onTap,
-        leading: _buildLeadingAvatar(),
-        title: Text(
-          conversation.displayName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(
-          conversation.lastMessageText ?? '',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-        ),
-        trailing: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isClosed)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 6),
-                    child: Icon(Icons.lock, size: 14),
-                  ),
-                Text(
-                  formatTime(conversation.lastMessageAt),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (conversation.unreadCount > 0)
-              CircleAvatar(
-                radius: 11,
-                backgroundColor: Colors.green,
-                child: Text(
-                  conversation.unreadCount > 99
-                      ? '99+'
-                      : conversation.unreadCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              )
-            else
-              const SizedBox(height: 22),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildLeadingAvatar() {
-    final hasName = conversation.contactName != null &&
-        conversation.contactName!.trim().isNotEmpty;
+  List<Conversation> _applyFilters() {
+    final query = _searchQuery.trim().toLowerCase();
+    final filtered = _conversations.where((conversation) {
+      final name = (conversation.contactName ?? '').toLowerCase();
+      final phone = conversation.phoneNumber.toLowerCase();
+      final preview = (conversation.lastMessageText ?? '').toLowerCase();
+      final matchesQuery = query.isEmpty ||
+          name.contains(query) ||
+          phone.contains(query) ||
+          preview.contains(query);
 
-    if (!hasName) {
-      return const CircleAvatar(
-        child: Icon(Icons.phone),
-      );
-    }
+      if (!matchesQuery) return false;
 
-    final initials = _extractInitials(conversation.contactName!);
-    return CircleAvatar(
-      child: Text(initials),
+      switch (_activeFilter) {
+        case _InboxFilter.unread:
+          return conversation.unreadCount > 0;
+        case _InboxFilter.active:
+          return conversation.replyWindowOpen;
+        case _InboxFilter.closed:
+          return conversation.status.toUpperCase() == 'CLOSED';
+        case _InboxFilter.all:
+          return true;
+      }
+    }).toList();
+
+    return filtered;
+  }
+
+  Widget _buildEmptyState() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: 420,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 80,
+                    color: WAColors.textTertiary,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Henüz konuşma yok',
+                    textAlign: TextAlign.center,
+                    style: WATextStyles.emptyTitle,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Bir kullanıcı size mesaj gönderdiğinde burada görünecek.',
+                    textAlign: TextAlign.center,
+                    style: WATextStyles.emptySubtitle,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  String _extractInitials(String value) {
-    final words = value.trim().split(RegExp(r'\s+'));
-    if (words.isEmpty) return '?';
-    if (words.length == 1) return words.first.characters.first.toUpperCase();
-    final first = words.first.characters.first;
-    final second = words[1].characters.first;
-    return (first + second).toUpperCase();
+  Widget _buildNoResults() {
+    final query = _searchQuery.trim();
+    final message = query.isEmpty
+      ? 'Sonuç bulunamadı'
+      : '$query için sonuç bulunamadı';
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: 320,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.search_off, size: 48, color: WAColors.textTertiary),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: WATextStyles.emptySubtitle,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState(String message) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: 360,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_off, size: 48, color: WAColors.errorRed),
+                const SizedBox(height: 12),
+                const Text(
+                  'Bağlantı kurulamadı',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: WAColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: WAColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => _loadConversations(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: WAColors.accent,
+                  ),
+                  child: const Text('Tekrar Dene'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openConversation(Conversation conversation) async {
+    if (widget.onConversationSelected != null) {
+      widget.onConversationSelected!(conversation);
+      return;
+    }
+
+    final updated = await Navigator.push<Conversation>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversation: conversation,
+        ),
+      ),
+    );
+
+    if (!context.mounted || updated == null) return;
+
+    final idx = _conversations.indexWhere((c) => c.id == updated.id);
+    if (idx < 0) return;
+    setState(() {
+      _conversations[idx] = updated;
+    });
+  }
+
+  KeyEventResult _handleListKeyEvent(
+    KeyEvent event,
+    List<Conversation> filtered,
+  ) {
+    if (event is! KeyDownEvent || filtered.isEmpty) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        _focusedIndex = (_focusedIndex ?? -1) + 1;
+        if (_focusedIndex! >= filtered.length) {
+          _focusedIndex = filtered.length - 1;
+        }
+      });
+      return KeyEventResult.handled;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      setState(() {
+        _focusedIndex = (_focusedIndex ?? filtered.length) - 1;
+        if (_focusedIndex! < 0) {
+          _focusedIndex = 0;
+        }
+      });
+      return KeyEventResult.handled;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.enter) {
+      final index = _focusedIndex ?? 0;
+      if (index >= 0 && index < filtered.length) {
+        _openConversation(filtered[index]);
+        return KeyEventResult.handled;
+      }
+    }
+
+    return KeyEventResult.ignored;
+  }
+}
+
+enum _InboxFilter { all, unread, active, closed }
+
+class _LoadingSkeleton extends StatefulWidget {
+  const _LoadingSkeleton();
+
+  @override
+  State<_LoadingSkeleton> createState() => _LoadingSkeletonState();
+}
+
+class _LoadingSkeletonState extends State<_LoadingSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.4, end: 0.9).animate(_controller),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: 6,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              height: 72,
+              decoration: BoxDecoration(
+                color: WAColors.composerBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
