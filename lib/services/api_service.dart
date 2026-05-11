@@ -31,4 +31,16 @@ class ApiService {
   Future<Conversation> closeConversation(int conversationId) {
     return _conversationService.closeConversation(conversationId);
   }
+
+  Future<int> clearAllMessages(int conversationId) {
+    return _conversationService.clearAllMessages(conversationId);
+  }
+
+  Future<void> deleteMessage(int conversationId, int messageId) {
+    return _conversationService.deleteMessage(conversationId, messageId);
+  }
+
+  Future<Map<String, dynamic>> deleteConversation(int conversationId) {
+    return _conversationService.deleteConversation(conversationId);
+  }
 }

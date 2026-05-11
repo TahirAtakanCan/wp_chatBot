@@ -10,12 +10,16 @@ class ConversationTile extends StatefulWidget {
   final Conversation conversation;
   final VoidCallback onTap;
   final bool isSelected;
+  final VoidCallback? onDelete;
+  final VoidCallback? onClear;
 
   const ConversationTile({
     super.key,
     required this.conversation,
     required this.onTap,
     this.isSelected = false,
+    this.onDelete,
+    this.onClear,
   });
 
   @override
@@ -51,6 +55,9 @@ class _ConversationTileState extends State<ConversationTile> {
             color: Colors.transparent,
             child: InkWell(
               onTap: widget.onTap,
+              onSecondaryTapDown: (details) {
+                _showContextMenu(context, details.globalPosition);
+              },
               child: SizedBox(
                 height: 76,
                 child: Row(
@@ -157,6 +164,42 @@ class _ConversationTileState extends State<ConversationTile> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx,
+        position.dy,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'clear',
+          child: const Row(
+            children: [
+              Icon(Icons.cleaning_services, color: Colors.orange, size: 18),
+              SizedBox(width: 12),
+              Text('Temizle'),
+            ],
+          ),
+          onTap: () => widget.onClear?.call(),
+        ),
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: const Row(
+            children: [
+              Icon(Icons.delete_outline, color: Colors.red, size: 18),
+              SizedBox(width: 12),
+              Text('Sil', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+          onTap: () => widget.onDelete?.call(),
+        ),
+      ],
     );
   }
 

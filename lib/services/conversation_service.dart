@@ -149,6 +149,89 @@ class ConversationService {
     return Conversation.fromJson(decoded);
   }
 
+  /// Bir conversation'ın TÜM mesajlarını sil (conversation'ı temizle)
+  /// Dönüş: {"deleted": <silinen_mesaj_sayısı>}
+  Future<int> clearAllMessages(int conversationId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/api/conversations/$conversationId/messages'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      return _toInt(decoded['deleted']);
+    }
+
+    if (response.statusCode == 404) {
+      throw ApiException(
+        'Konusma bulunamadi',
+        statusCode: response.statusCode,
+      );
+    }
+
+    throw ApiException(
+      'Mesajlar silinirken hata',
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// Tek bir mesajı sil
+  /// Dönüş: 204 No Content (boş döner)
+  Future<void> deleteMessage(int conversationId, int messageId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/api/conversations/$conversationId/messages/$messageId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 204) {
+      return; // Başarılı
+    }
+
+    if (response.statusCode == 404) {
+      throw ApiException(
+        'Mesaj bulunamadi',
+        statusCode: response.statusCode,
+      );
+    }
+
+    throw ApiException(
+      'Mesaj silinirken hata',
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// Conversation'ı tüm mesajlarıyla birlikte sil
+  /// Dönüş: {"deletedConversationId": <id>, "deletedMessages": <sayı>}
+  Future<Map<String, dynamic>> deleteConversation(int conversationId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/api/conversations/$conversationId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      return decoded;
+    }
+
+    if (response.statusCode == 404) {
+      throw ApiException(
+        'Konusma bulunamadi',
+        statusCode: response.statusCode,
+      );
+    }
+
+    throw ApiException(
+      'Konusma silinirken hata',
+      statusCode: response.statusCode,
+    );
+  }
+
+  static int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
   List<dynamic> _extractContentList(dynamic decoded) {
     if (decoded is List<dynamic>) {
       return decoded;

@@ -332,6 +332,53 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _confirmClearMessages() async {
+    if (!mounted) return;
+
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mesajları Temizle'),
+        content: const Text(
+          'Bu konuşmanın tüm mesajları temizlenecektir. Bu işlem geri alınamaz.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Temizle'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true) {
+      _clearMessages();
+    }
+  }
+
+  Future<void> _clearMessages() async {
+    if (!mounted || _conversation == null) return;
+
+    try {
+      final deletedCount = await _apiService.clearAllMessages(_conversation!.id);
+      if (!mounted) return;
+
+      setState(() {
+        _messages.clear();
+      });
+      _showSnackBar('$deletedCount mesaj temizlendi');
+    } catch (e) {
+      _showSnackBar('Mesajlar temizlenemedi: $e');
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
@@ -456,6 +503,9 @@ class _ChatScreenState extends State<ChatScreen> {
               if (value == 'contact_card') {
                 _confirmSendContactCard();
               }
+              if (value == 'clear_messages') {
+                _confirmClearMessages();
+              }
               if (value == 'info') {
                 _showSnackBar('Yakında: bilgiler');
               }
@@ -468,6 +518,11 @@ class _ChatScreenState extends State<ChatScreen> {
               PopupMenuItem<String>(
                 value: 'contact_card',
                 child: Text('Kişi Kartı Gönder'),
+              ),
+              PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'clear_messages',
+                child: Text('Mesajları Temizle', style: TextStyle(color: Colors.red)),
               ),
               PopupMenuItem<String>(
                 value: 'info',
@@ -637,6 +692,9 @@ class _ChatScreenState extends State<ChatScreen> {
           if (value == 'contact_card') {
             _confirmSendContactCard();
           }
+          if (value == 'clear_messages') {
+            _confirmClearMessages();
+          }
           if (value == 'info') {
             _showSnackBar('Yakında: bilgiler');
           }
@@ -649,6 +707,11 @@ class _ChatScreenState extends State<ChatScreen> {
           PopupMenuItem<String>(
             value: 'contact_card',
             child: Text('Kişi Kartı Gönder'),
+          ),
+          PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: 'clear_messages',
+            child: Text('Mesajları Temizle', style: TextStyle(color: Colors.red)),
           ),
           PopupMenuItem<String>(
             value: 'info',

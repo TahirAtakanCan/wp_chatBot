@@ -334,6 +334,8 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
               conversation: conversation,
               isSelected: widget.selectedConversation?.id == conversation.id,
               onTap: () => _openConversation(conversation),
+              onDelete: () => _confirmDeleteConversation(conversation),
+              onClear: () => _confirmClearConversation(conversation),
             );
           },
         ),
@@ -504,6 +506,146 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
     setState(() {
       _conversations[idx] = updated;
     });
+  }
+
+  Future<void> _confirmDeleteConversation(Conversation conversation) async {
+    if (!mounted) return;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konuşmayı Sil'),
+        content: Text(
+          '${conversation.displayName} ile olan konuşma silinecektir. Bu işlem geri alınamaz.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      _deleteConversation(conversation);
+    }
+  }
+
+  Future<void> _deleteConversation(Conversation conversation) async {
+    if (!mounted) return;
+
+    try {
+      await _apiService.deleteConversation(conversation.id);
+      if (!mounted) return;
+
+      setState(() {
+        _conversations.removeWhere((c) => c.id == conversation.id);
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('${conversation.displayName} silindi'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Silme başarısız: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
+  Future<void> _clearConversation(Conversation conversation) async {
+    if (!mounted) return;
+
+    try {
+      final deletedCount = await _apiService.clearAllMessages(conversation.id);
+      if (!mounted) return;
+
+      final idx = _conversations.indexWhere((c) => c.id == conversation.id);
+      if (idx < 0) return;
+
+      // Konuşmayı sıfırla
+      final cleared = Conversation(
+        id: conversation.id,
+        phoneNumber: conversation.phoneNumber,
+        contactName: conversation.contactName,
+        lastMessageAt: DateTime.now(),
+        lastMessageText: null,
+        unreadCount: 0,
+        status: conversation.status,
+        replyWindowOpen: conversation.replyWindowOpen,
+      );
+
+      setState(() {
+        _conversations[idx] = cleared;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('$deletedCount mesaj temizlendi'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Temizleme başarısız: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
+  Future<void> _confirmClearConversation(Conversation conversation) async {
+    if (!mounted) return;
+
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konuşmayı Temizle'),
+        content: Text(
+          '${conversation.displayName} ile olan konuşmanın içeriği silinecektir. Konuşma listede kalacak.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('Temizle'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true) {
+      _clearConversation(conversation);
+    }
   }
 
   KeyEventResult _handleListKeyEvent(
