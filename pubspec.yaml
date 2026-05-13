@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  audioplayers: ^6.1.0
+  local_notifier: ^0.1.5
+  window_manager: ^0.3.9
   provider: ^6.1.2
   file_picker: ^8.1.6
   http: ^1.2.0
@@ -26,6 +29,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/sounds/
 
 flutter_icons:
   android: true

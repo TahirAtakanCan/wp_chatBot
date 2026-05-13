@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/conversation.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../theme/wa_colors.dart';
 import '../theme/wa_text_styles.dart';
 import '../widgets/conversation_tile.dart';
@@ -30,6 +32,8 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
   final FocusNode _listFocusNode = FocusNode();
   Timer? _pollingTimer;
+  int _lastTotalUnreadCount = 0;
+  bool _isFirstLoad = true;
 
   List<Conversation> _conversations = <Conversation>[];
   String _searchQuery = '';
@@ -110,6 +114,28 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
       final conversations = await _apiService.fetchConversations(page: 0, size: 50);
       if (!mounted) return;
 
+      final newTotalUnread = conversations.fold<int>(
+        0,
+        (sum, conv) => sum + conv.unreadCount,
+      );
+
+      if (!_isFirstLoad && newTotalUnread > _lastTotalUnreadCount) {
+        Conversation? newestUnread;
+        for (final conv in conversations) {
+          if (conv.unreadCount > 0) {
+            newestUnread = conv;
+            break;
+          }
+        }
+        NotificationService().playNewMessageSound(
+          contactName: newestUnread?.contactName ?? newestUnread?.phoneNumber,
+          preview: newestUnread?.lastMessageText,
+        );
+      }
+
+      _lastTotalUnreadCount = newTotalUnread;
+      _isFirstLoad = false;
+
       setState(() {
         _conversations = conversations;
         _errorMessage = null;
@@ -170,6 +196,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildHeader() {
+    final soundEnabled = NotificationService().isSoundEnabled;
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -193,6 +220,22 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
             ),
           ),
           const Spacer(),
+          IconButton(
+            tooltip: soundEnabled ? 'Bildirimi Kapat' : 'Bildirimi Ac',
+            onPressed: () async {
+              final newValue = !NotificationService().isSoundEnabled;
+              NotificationService().enableSound(newValue);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('sound_enabled', newValue);
+              if (mounted) setState(() {});
+            },
+            icon: Icon(
+              soundEnabled ? Icons.volume_up : Icons.volume_off,
+              size: 24,
+            ),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            splashRadius: 20,
+          ),
           IconButton(
             tooltip: 'Filtrele',
             onPressed: () {},

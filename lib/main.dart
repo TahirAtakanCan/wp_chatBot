@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'providers/auth_provider.dart';
 import 'providers/message_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'services/notification_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().initialize();
+  final prefs = await SharedPreferences.getInstance();
+  final soundEnabled = prefs.getBool('sound_enabled') ?? true;
+  NotificationService().enableSound(soundEnabled);
   runApp(const MainApp());
 }
 

@@ -150,7 +150,7 @@ class ConversationService {
   }
 
   /// Bir conversation'ın TÜM mesajlarını sil (conversation'ı temizle)
-  /// Dönüş: {"deleted": <silinen_mesaj_sayısı>}
+  /// Dönüş: {"deleted": silinen_mesaj_sayisi}
   Future<int> clearAllMessages(int conversationId) async {
     final response = await http.delete(
       Uri.parse('$_baseUrl/api/conversations/$conversationId/messages'),
@@ -201,7 +201,7 @@ class ConversationService {
   }
 
   /// Conversation'ı tüm mesajlarıyla birlikte sil
-  /// Dönüş: {"deletedConversationId": <id>, "deletedMessages": <sayı>}
+  /// Dönüş: {"deletedConversationId": id, "deletedMessages": sayi}
   Future<Map<String, dynamic>> deleteConversation(int conversationId) async {
     final response = await http.delete(
       Uri.parse('$_baseUrl/api/conversations/$conversationId'),
