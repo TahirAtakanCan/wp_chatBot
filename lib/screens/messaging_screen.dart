@@ -35,6 +35,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
                 color: WAColors.leftPanelBg,
                 child: InboxScreen(
                   showAppBar: false,
+                  showBackButton: true,
                   selectedConversation: _selectedConversation,
                   onConversationSelected: (conversation) {
                     setState(() {

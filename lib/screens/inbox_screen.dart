@@ -16,12 +16,14 @@ class InboxScreen extends StatefulWidget {
   final ValueChanged<Conversation>? onConversationSelected;
   final Conversation? selectedConversation;
   final bool showAppBar;
+  final bool showBackButton;
 
   const InboxScreen({
     super.key,
     this.onConversationSelected,
     this.selectedConversation,
     this.showAppBar = true,
+    this.showBackButton = false,
   });
 
   @override
@@ -111,7 +113,8 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
 
     _isRequestInFlight = true;
     try {
-      final conversations = await _apiService.fetchConversations(page: 0, size: 50);
+      final conversations =
+          await _apiService.fetchConversations(page: 0, size: 50);
       if (!mounted) return;
 
       final newTotalUnread = conversations.fold<int>(
@@ -208,6 +211,14 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
       ),
       child: Row(
         children: [
+          if (widget.showBackButton)
+            IconButton(
+              tooltip: 'Geri',
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back, size: 24),
+              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+              splashRadius: 20,
+            ),
           CircleAvatar(
             radius: 20,
             backgroundColor: WAColors.accent,
@@ -454,9 +465,8 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
 
   Widget _buildNoResults() {
     final query = _searchQuery.trim();
-    final message = query.isEmpty
-      ? 'Sonuç bulunamadı'
-      : '$query için sonuç bulunamadı';
+    final message =
+        query.isEmpty ? 'Sonuç bulunamadı' : '$query için sonuç bulunamadı';
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -467,7 +477,8 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.search_off, size: 48, color: WAColors.textTertiary),
+                const Icon(Icons.search_off,
+                    size: 48, color: WAColors.textTertiary),
                 const SizedBox(height: 12),
                 Text(
                   message,

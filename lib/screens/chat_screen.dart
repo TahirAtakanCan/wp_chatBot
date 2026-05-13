@@ -367,7 +367,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted || _conversation == null) return;
 
     try {
-      final deletedCount = await _apiService.clearAllMessages(_conversation!.id);
+      final deletedCount =
+          await _apiService.clearAllMessages(_conversation!.id);
       if (!mounted) return;
 
       setState(() {
@@ -481,6 +482,13 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
+          IconButton(
+            tooltip: 'Geri',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back, size: 24),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            splashRadius: 20,
+          ),
           Avatar(
             name: conversation.contactName,
             phoneNumber: conversation.phoneNumber,
@@ -522,7 +530,8 @@ class _ChatScreenState extends State<ChatScreen> {
               PopupMenuDivider(),
               PopupMenuItem<String>(
                 value: 'clear_messages',
-                child: Text('Mesajları Temizle', style: TextStyle(color: Colors.red)),
+                child: Text('Mesajları Temizle',
+                    style: TextStyle(color: Colors.red)),
               ),
               PopupMenuItem<String>(
                 value: 'info',
@@ -567,9 +576,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final horizontalPadding = width >= 1024
-            ? 64.0
-            : (width >= 768 ? 24.0 : 16.0);
+        final horizontalPadding =
+            width >= 1024 ? 64.0 : (width >= 768 ? 24.0 : 16.0);
 
         return ListView.builder(
           controller: _scrollController,
@@ -711,7 +719,8 @@ class _ChatScreenState extends State<ChatScreen> {
           PopupMenuDivider(),
           PopupMenuItem<String>(
             value: 'clear_messages',
-            child: Text('Mesajları Temizle', style: TextStyle(color: Colors.red)),
+            child:
+                Text('Mesajları Temizle', style: TextStyle(color: Colors.red)),
           ),
           PopupMenuItem<String>(
             value: 'info',
@@ -727,7 +736,8 @@ class _ChatScreenState extends State<ChatScreen> {
     DateTime? lastDate;
 
     for (final msg in messages) {
-      final msgDate = DateTime(msg.sentAt.year, msg.sentAt.month, msg.sentAt.day);
+      final msgDate =
+          DateTime(msg.sentAt.year, msg.sentAt.month, msg.sentAt.day);
       if (lastDate == null || !_isSameDay(msgDate, lastDate)) {
         items.add(_ChatListItem.separator(msgDate));
         lastDate = msgDate;

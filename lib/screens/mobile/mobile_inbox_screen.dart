@@ -7,6 +7,6 @@ class MobileInboxScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const InboxScreen();
+    return const InboxScreen(showBackButton: true);
   }
 }
