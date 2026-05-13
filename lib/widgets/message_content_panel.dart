@@ -330,12 +330,14 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
               ),
               child: Row(
                 children: [
-                  _ToolbarButton(
-                    icon: Icons.content_cut_rounded,
-                    label: 'Mesaj Ayır',
-                    shortcut: '⇧ Enter',
-                    onTap: _insertSeparator,
-                    theme: theme,
+                  Flexible(
+                    child: _ToolbarButton(
+                      icon: Icons.content_cut_rounded,
+                      label: 'Mesaj Ayır',
+                      shortcut: '⇧ Enter',
+                      onTap: _insertSeparator,
+                      theme: theme,
+                    ),
                   ),
                   Container(
                     width: 1,
@@ -345,14 +347,14 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                     color: theme.colorScheme.outlineVariant
                         .withValues(alpha: 0.4),
                   ),
-                  _ToolbarButton(
-                    icon: Icons.upload_file_rounded,
-                    label: 'Bilgisayardan Yükle',
-                    onTap: () => provider.uploadMediaFromDevice(),
-                    theme: theme,
-                    badge: provider.hasMedia
-                        ? provider.mediaCount
-                        : null,
+                  Flexible(
+                    child: _ToolbarButton(
+                      icon: Icons.upload_file_rounded,
+                      label: 'Bilgisayardan Yükle',
+                      onTap: () => provider.uploadMediaFromDevice(),
+                      theme: theme,
+                      badge: provider.hasMedia ? provider.mediaCount : null,
+                    ),
                   ),
                   if (provider.hasMedia) ...[
                     Container(
@@ -493,30 +495,36 @@ class _ToolbarButton extends StatelessWidget {
               Icon(icon,
                   size: 15, color: theme.colorScheme.primary),
               const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.onSurface,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
               ),
               if (badge != null) ...[
                 const SizedBox(width: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$badge',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          theme.colorScheme.onPrimaryContainer,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 48),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$badge',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
                     ),
                   ),
                 ),

@@ -13,6 +13,9 @@ import '../widgets/contact_list_panel.dart';
 import '../widgets/message_content_panel.dart';
 import '../widgets/action_panel.dart';
 import '../widgets/progress_log_panel.dart';
+import '../widgets/responsive_layout.dart';
+import 'mobile/mobile_home_screen.dart';
+import 'mobile/mobile_bulk_send_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,6 +52,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ResponsiveLayout(
+      mobile: MobileHomeScreen(
+        onInbox: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MessagingScreen()),
+        ),
+        onBulkSend: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MobileBulkSendScreen()),
+        ),
+        onDeliveryHistory: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DeliveryHistoryScreen()),
+        ),
+        onContacts: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ContactsScreen()),
+        ),
+        onTemplates: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TemplatesScreen()),
+        ),
+        onLogout: () async {
+          await context.read<AuthProvider>().logout();
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (_) => false,
+            );
+          }
+        },
+      ),
+      desktop: _buildDesktopHome(context),
+    );
+  }
+
+  Widget _buildDesktopHome(BuildContext context) {
     final theme = Theme.of(context);
     final badgeColor = _metaApiConnected == null
       ? const Color(0xFFFFF8E1)

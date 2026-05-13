@@ -5,10 +5,12 @@ import '../providers/message_provider.dart';
 class ContactListPanel extends StatefulWidget {
   final List<String>? rehberdenSecilenler;
   final VoidCallback? onRehberdenSec;
+  final bool compact;
   const ContactListPanel({
     super.key,
     this.rehberdenSecilenler,
     this.onRehberdenSec,
+    this.compact = false,
   });
 
   @override
@@ -72,70 +74,149 @@ class _ContactListPanelState extends State<ContactListPanel> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Başlık satırı
-            Row(
-              children: [
-                Icon(Icons.contacts, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Kişi Listesi',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: provider.phoneCount > 0
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+            if (widget.compact)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Icon(
-                        Icons.phone,
-                        size: 14,
-                        color: provider.phoneCount > 0
-                            ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
+                      Icon(Icons.contacts, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
                       Text(
-                        '${provider.phoneCount} numara',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                        'Kişi Listesi',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
                           color: provider.phoneCount > 0
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.onSurfaceVariant,
+                              ? theme.colorScheme.primaryContainer
+                              : theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.phone,
+                              size: 14,
+                              color: provider.phoneCount > 0
+                                  ? theme.colorScheme.onPrimaryContainer
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${provider.phoneCount} numara',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: provider.phoneCount > 0
+                                    ? theme.colorScheme.onPrimaryContainer
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.clear_all),
-                  label: const Text('Seçimi Temizle'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surface,
-                    foregroundColor: theme.colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.clear_all, size: 18),
+                      label: const Text('Seçimi Temizle'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: theme.colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onPressed: () {
+                        // Sadece numara listesini temizle
+                        final provider = context.read<MessageProvider>();
+                        setState(() {
+                          provider.phoneController.text = '';
+                          provider.parsePhoneNumbers();
+                        });
+                      },
+                    ),
                   ),
-                  onPressed: () {
-                    // Sadece numara listesini temizle
-                    final provider = context.read<MessageProvider>();
-                    setState(() {
-                      provider.phoneController.text = '';
-                      provider.parsePhoneNumbers();
-                    });
-                  },
-                ),
-              ],
-            ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Icon(Icons.contacts, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Kişi Listesi',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: provider.phoneCount > 0
+                          ? theme.colorScheme.primaryContainer
+                          : theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.phone,
+                          size: 14,
+                          color: provider.phoneCount > 0
+                              ? theme.colorScheme.onPrimaryContainer
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${provider.phoneCount} numara',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: provider.phoneCount > 0
+                                ? theme.colorScheme.onPrimaryContainer
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140, minWidth: 0),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('Seçimi Temizle'),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        backgroundColor: theme.colorScheme.surface,
+                        foregroundColor: theme.colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                      onPressed: () {
+                        // Sadece numara listesini temizle
+                        final provider = context.read<MessageProvider>();
+                        setState(() {
+                          provider.phoneController.text = '';
+                          provider.parsePhoneNumbers();
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
             const SizedBox(height: 10),
 
             // Telefon numaraları girişi

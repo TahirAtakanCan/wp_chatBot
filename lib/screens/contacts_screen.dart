@@ -10,6 +10,8 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/contact_service.dart';
 import '../widgets/delivery_status_icon.dart';
+import '../widgets/responsive_layout.dart';
+import 'mobile/mobile_contacts_view.dart';
 
 class ContactsScreen extends StatefulWidget {
   final List<String> initiallySelectedNumbers;
@@ -384,6 +386,32 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget build(BuildContext context) {
     final selectedCount = _selectedContactIds.length;
 
+    return ResponsiveLayout(
+      mobile: MobileContactsView(
+        contacts: _filteredContacts,
+        statusByPhone: _deliveryStatusByPhone,
+        selectedContactIds: _selectedContactIds,
+        selectedLetters: _selectedLetters,
+        letters: _letters,
+        loading: _loading,
+        syncing: _syncing,
+        selectedCount: selectedCount,
+        onSelectAll: _onSelectAll,
+        onDeselectAll: _onDeselectAll,
+        onSearchChanged: _onSearchChanged,
+        onLetterTap: _onLetterTap,
+        onToggleContact: _onToggleContact,
+        onContactLongPress: _onContactLongPress,
+        onAddSelected: _onAddSelected,
+        onSyncFromSheets: _syncFromSheets,
+        onDeleteAll: _deleteAllContacts,
+        onResetSheetUrl: _resetSheetUrl,
+      ),
+      desktop: _buildDesktopView(context, selectedCount),
+    );
+  }
+
+  Widget _buildDesktopView(BuildContext context, int selectedCount) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Kişi Rehberi${selectedCount > 0 ? ' ($selectedCount seçili)' : ''}'),

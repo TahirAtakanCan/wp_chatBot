@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
+import '../widgets/responsive_layout.dart';
 import 'home_screen.dart';
+import 'mobile/mobile_login_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -48,6 +51,24 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
 
+    return ResponsiveLayout(
+      mobile: MobileLoginScreen(
+        formKey: _formKey,
+        usernameController: _usernameController,
+        passwordController: _passwordController,
+        obscurePassword: _obscurePassword,
+        onToggleObscure: () => setState(
+          () => _obscurePassword = !_obscurePassword,
+        ),
+        onSubmit: _handleLogin,
+        isLoading: authProvider.isLoading,
+        errorMessage: authProvider.errorMessage,
+      ),
+      desktop: _buildDesktopLogin(authProvider),
+    );
+  }
+
+  Widget _buildDesktopLogin(AuthProvider authProvider) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: Center(
@@ -210,22 +231,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: authProvider.isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Giriş Yap',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                          child: Text(
+                            authProvider.isLoading
+                                ? 'Giriş yapılıyor...'
+                                : 'Giriş Yap',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ],

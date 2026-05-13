@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/delivery_record.dart';
 import '../services/api_service.dart';
 import '../widgets/delivery_status_icon.dart';
+import '../widgets/responsive_layout.dart';
+import 'mobile/mobile_delivery_history_view.dart';
 
 class DeliveryHistoryScreen extends StatefulWidget {
   const DeliveryHistoryScreen({super.key});
@@ -199,6 +201,35 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ResponsiveLayout(
+      mobile: MobileDeliveryHistoryView(
+        records: _records,
+        stats: _stats,
+        loading: _loading,
+        loadingMore: _loadingMore,
+        filterStatus: _filterStatus,
+        sortKey: _sortKey,
+        scrollController: _scrollController,
+        onRefresh: () {
+          _loadStats();
+          _loadRecords(reset: true);
+        },
+        onFilterChanged: (value) {
+          setState(() => _filterStatus = value);
+          _loadRecords(reset: true);
+        },
+        onSortChanged: (value) {
+          setState(() => _sortKey = value);
+          _loadRecords(reset: true);
+        },
+        onRecordTap: _showHistoryForPhone,
+        formatDateTime: _formatDateTime,
+      ),
+      desktop: _buildDesktopView(context),
+    );
+  }
+
+  Widget _buildDesktopView(BuildContext context) {
     final total = _stats['total'] ?? 0;
     final delivered = _stats['delivered'] ?? 0;
     final failed = _stats['failed'] ?? 0;
