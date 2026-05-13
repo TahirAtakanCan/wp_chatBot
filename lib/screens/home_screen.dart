@@ -7,6 +7,7 @@ import '../screens/templates_screen.dart';
 import '../screens/user_management_screen.dart';
 import '../screens/messaging_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/delivery_history_screen.dart';
 import '../services/session_service.dart';
 import '../widgets/contact_list_panel.dart';
 import '../widgets/message_content_panel.dart';
@@ -156,6 +157,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               icon: const Icon(Icons.inbox_outlined, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Gonderim Raporlari',
+            child: IconButton.filledTonal(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const DeliveryHistoryScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.bar_chart, size: 22),
             ),
           ),
           const SizedBox(width: 8),

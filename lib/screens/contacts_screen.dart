@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/contact_model.dart';
-import '../services/contact_service.dart';
+import '../models/delivery_record.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
+import '../services/contact_service.dart';
+import '../widgets/delivery_status_icon.dart';
 
 class ContactsScreen extends StatefulWidget {
   final List<String> initiallySelectedNumbers;
@@ -15,6 +21,12 @@ class ContactsScreen extends StatefulWidget {
 
 class _ContactsScreenState extends State<ContactsScreen> {
   final ContactService _contactService = ContactService();
+  final ApiService _apiService = ApiService();
+  final ScrollController _listController = ScrollController();
+  Timer? _statusLookupTimer;
+  bool _statusRequestInFlight = false;
+  final Map<String, DeliveryStatus> _deliveryStatusByPhone = {};
+  static const double _itemExtent = 56.0;
   List<ContactModel> _contacts = [];
   List<ContactModel> _filteredContacts = [];
   Set<int> _selectedContactIds = {};
@@ -38,7 +50,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
   void initState() {
     super.initState();
     _selectedContactIds.clear();
+    _listController.addListener(_scheduleStatusLookup);
     _fetchContacts();
+  }
+
+  @override
+  void dispose() {
+    _statusLookupTimer?.cancel();
+    _listController.removeListener(_scheduleStatusLookup);
+    _listController.dispose();
+    super.dispose();
   }
 
   // ─── FİLTRELEME ───────────────────────────────────────────────
@@ -86,6 +107,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     if (_autoSelect) {
       _selectedContactIds = _filteredContacts.map((c) => c.id).toSet();
     }
+    _scheduleStatusLookup();
   }
 
   // ─── VERİ ÇEKME ───────────────────────────────────────────────
@@ -103,10 +125,63 @@ class _ContactsScreenState extends State<ContactsScreen> {
             .toSet();
         _filteredContacts = _applyFilters();
       });
+      _scheduleStatusLookup();
     } finally {
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  void _scheduleStatusLookup() {
+    if (!mounted) return;
+    _statusLookupTimer?.cancel();
+    _statusLookupTimer = Timer(const Duration(milliseconds: 200), () {
+      if (!_listController.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scheduleStatusLookup();
+        });
+        return;
+      }
+      _lookupVisibleStatuses();
+    });
+  }
+
+  Future<void> _lookupVisibleStatuses() async {
+    if (_statusRequestInFlight) return;
+    if (!_listController.hasClients) return;
+
+    final viewport = _listController.position.viewportDimension;
+    final offset = _listController.offset;
+    final startIndex = (offset / _itemExtent)
+        .floor()
+        .clamp(0, _filteredContacts.length);
+    final endIndex = ((offset + viewport) / _itemExtent)
+        .ceil()
+        .clamp(0, _filteredContacts.length);
+    final visible = _filteredContacts.sublist(
+      startIndex,
+      endIndex > startIndex ? endIndex : startIndex,
+    );
+
+    final phones = visible
+        .map((c) => c.phone)
+        .where((p) => !_deliveryStatusByPhone.containsKey(p))
+        .toList();
+
+    if (phones.isEmpty) return;
+
+    _statusRequestInFlight = true;
+    try {
+      final result = await _apiService.lookupDeliveryStatuses(phones);
+      if (!mounted) return;
+      setState(() {
+        _deliveryStatusByPhone.addAll(result);
+      });
+    } catch (_) {
+      // Sessiz geç: status yoksa ikon gösterilmez.
+    } finally {
+      _statusRequestInFlight = false;
     }
   }
 
@@ -249,10 +324,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, null), child: const Text('İptal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('İptal'),
+          ),
           ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('Kaydet')),
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Kaydet'),
+          ),
         ],
       ),
     );
@@ -385,10 +464,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 : _filteredContacts.isEmpty
                     ? const Center(child: Text('Kişi bulunamadı.'))
                     : ListView.builder(
+                        controller: _listController,
                         itemCount: _filteredContacts.length,
                         itemBuilder: (context, index) {
                           final contact = _filteredContacts[index];
                           final selected = _selectedContactIds.contains(contact.id);
+                          final status = _deliveryStatusByPhone[contact.phone];
                           return ListTile(
                             dense: true,
                             onLongPress: () => _onContactLongPress(contact),
@@ -398,6 +479,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                             ),
                             title: Text(contact.name.isNotEmpty ? contact.name : '—'),
                             subtitle: Text(contact.phone),
+                            trailing: DeliveryStatusIcon(status: status),
                           );
                         },
                       ),
