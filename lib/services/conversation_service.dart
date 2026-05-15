@@ -79,7 +79,7 @@ class ConversationService {
     final response = await http.post(
       Uri.parse('$_baseUrl/api/conversations/$conversationId/reply-image'),
       headers: await _getHeaders(),
-      body: jsonEncode(body),
+      body: utf8.encode(jsonEncode(body)),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -111,10 +111,11 @@ class ConversationService {
   }
 
   Future<Message> sendReply(int conversationId, String text) async {
+    final payload = utf8.encode(jsonEncode({'text': text}));
     final response = await http.post(
       Uri.parse('$_baseUrl/api/conversations/$conversationId/reply'),
       headers: await _getHeaders(),
-      body: jsonEncode({'text': text}),
+      body: payload,
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {

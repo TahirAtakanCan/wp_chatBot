@@ -19,8 +19,11 @@ class AppConfig {
   static String get apiAuthUrl => '$baseHost/api/auth';
 
   /// JWT token içeren Authorization header'ları oluşturur.
+  static const String jsonContentType = 'application/json; charset=utf-8';
+
   static Map<String, String> authHeaders(String token) => {
-        'Content-Type': 'application/json',
+        'Content-Type': jsonContentType,
+        'Accept': 'application/json; charset=utf-8',
         'Authorization': 'Bearer $token',
       };
 }

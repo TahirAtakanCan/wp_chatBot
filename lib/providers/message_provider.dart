@@ -24,10 +24,7 @@ class MessageProvider extends ChangeNotifier {
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    return AppConfig.authHeaders(token);
   }
 
   // --- Kişi Listesi ---
