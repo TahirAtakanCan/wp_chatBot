@@ -30,7 +30,7 @@ class DeliveryService {
       'size': '$size',
       'sortBy': sortBy,
       'direction': direction,
-      if (status != null) 'status': status.name,
+      if (status != null) 'status': status.name.toUpperCase(),
     };
     final url = Uri.parse('$_baseUrl/api/delivery').replace(
       queryParameters: params,
@@ -106,5 +106,39 @@ class DeliveryService {
     }
 
     return {};
+  }
+
+  /// 2 günden eski gönderim kayıtlarını siler. Sunucu desteklemiyorsa 0 döner.
+  Future<int> purgeOlderThan({int days = 2}) async {
+    final candidates = [
+      Uri.parse('$_baseUrl/api/delivery/purge').replace(
+        queryParameters: {'days': '$days'},
+      ),
+      Uri.parse('$_baseUrl/api/delivery/cleanup').replace(
+        queryParameters: {'days': '$days'},
+      ),
+      Uri.parse('$_baseUrl/api/delivery/old').replace(
+        queryParameters: {'olderThanDays': '$days'},
+      ),
+    ];
+
+    for (final url in candidates) {
+      try {
+        final response = await http.delete(url, headers: await _authHeaders());
+        if (response.statusCode == 200 || response.statusCode == 204) {
+          if (response.body.isEmpty) return 0;
+          final body = jsonDecode(response.body);
+          if (body is Map<String, dynamic>) {
+            return (body['deleted'] ?? body['deletedCount'] ?? 0) as int;
+          }
+          if (body is int) return body;
+          return 0;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+
+    return 0;
   }
 }

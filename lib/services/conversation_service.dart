@@ -66,6 +66,50 @@ class ConversationService {
         .toList();
   }
 
+  Future<Message> sendReplyImage(
+    int conversationId, {
+    required String imageUrl,
+    String? caption,
+  }) async {
+    final body = <String, dynamic>{
+      'imageUrl': imageUrl,
+      if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+    };
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/conversations/$conversationId/reply-image'),
+      headers: await _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      return Message.fromJson(decoded);
+    }
+
+    final errorBody = _decodeAsMap(response.body);
+    final errorCode = _extractErrorCode(errorBody);
+
+    if (response.statusCode == 422 && errorCode == 'REPLY_WINDOW_CLOSED') {
+      throw ReplyWindowClosedException(
+        'Yanit penceresi kapali',
+        statusCode: response.statusCode,
+      );
+    }
+
+    if (response.statusCode == 429) {
+      throw RateLimitedException(
+        'Cok fazla istek gonderildi',
+        statusCode: response.statusCode,
+      );
+    }
+
+    throw ApiException(
+      errorBody['message']?.toString() ?? 'Resim gonderilemedi',
+      statusCode: response.statusCode,
+    );
+  }
+
   Future<Message> sendReply(int conversationId, String text) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/api/conversations/$conversationId/reply'),

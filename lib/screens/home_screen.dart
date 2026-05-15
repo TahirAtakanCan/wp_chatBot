@@ -9,6 +9,7 @@ import '../screens/messaging_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/delivery_history_screen.dart';
 import '../services/session_service.dart';
+import '../theme/wa_colors.dart';
 import '../widgets/contact_list_panel.dart';
 import '../widgets/message_content_panel.dart';
 import '../widgets/action_panel.dart';
@@ -91,32 +92,32 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildDesktopHome(BuildContext context) {
     final theme = Theme.of(context);
     final badgeColor = _metaApiConnected == null
-      ? const Color(0xFFFFF8E1)
-      : (_metaApiConnected == true
-        ? const Color(0xFFE8F5E9)
-        : const Color(0xFFFFEBEE));
+        ? WAColors.warningBg
+        : (_metaApiConnected == true
+            ? WAColors.accent.withValues(alpha: 0.12)
+            : const Color(0xFFFFEBEE));
     final badgeBorder = _metaApiConnected == null
-      ? const Color(0xFFFFB300)
-      : (_metaApiConnected == true
-        ? const Color(0xFF4CAF50)
-        : const Color(0xFFE53935));
+        ? WAColors.warningYellow
+        : (_metaApiConnected == true ? WAColors.accent : WAColors.errorRed);
     final badgeIcon = _metaApiConnected == null
-      ? Icons.sync
-      : (_metaApiConnected == true ? Icons.check_circle : Icons.error);
+        ? Icons.sync_rounded
+        : (_metaApiConnected == true
+            ? Icons.check_circle_rounded
+            : Icons.error_rounded);
     final badgeText = _metaApiConnected == null
-      ? 'Meta API kontrol ediliyor'
-      : (_metaApiConnected == true
-        ? 'Meta API Bağlı'
-        : 'Meta API Ulaşılamıyor');
+        ? 'Meta API kontrol ediliyor'
+        : (_metaApiConnected == true
+            ? 'Meta API Bağlı'
+            : 'Meta API Ulaşılamıyor');
     final badgeTextColor = _metaApiConnected == null
-      ? const Color(0xFF7A5A00)
-      : (_metaApiConnected == true
-        ? const Color(0xFF2E7D32)
-        : const Color(0xFFC62828));
+        ? const Color(0xFF7A5A00)
+        : (_metaApiConnected == true ? WAColors.accentDark : WAColors.errorRed);
 
     return Scaffold(
       key: _scaffoldKey,
+      backgroundColor: WAColors.appBackground,
       appBar: AppBar(
+        backgroundColor: WAColors.leftPanelHeader,
         title: Row(
           children: [
             // IHH Logo alanı
@@ -305,7 +306,18 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Padding(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              WAColors.leftPanelHeader,
+              WAColors.appBackground,
+            ],
+          ),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
@@ -360,6 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

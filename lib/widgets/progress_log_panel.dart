@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../providers/message_provider.dart';
 import '../models/sending_state.dart';
+import '../providers/message_provider.dart';
+import '../theme/wa_colors.dart';
+import 'home_panel_card.dart';
 
 class ProgressLogPanel extends StatelessWidget {
   const ProgressLogPanel({super.key});
@@ -46,86 +48,66 @@ class ProgressLogPanel extends StatelessWidget {
         break;
     }
 
-    return Card(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(14.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Başlık + Durum göstergesi
-            Row(
+    return HomePanelCard(
+      title: 'İlerleme & Log',
+      icon: Icons.terminal_rounded,
+      headerTrailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (provider.logs.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              tooltip: 'Tüm logları kopyala',
+              visualDensity: VisualDensity.compact,
+              onPressed: () {
+                final allLogs = provider.logs.join('\n');
+                Clipboard.setData(ClipboardData(text: allLogs));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Loglar panoya kopyalandı'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.terminal, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
+                Icon(statusIcon, size: 14, color: statusColor),
+                const SizedBox(width: 4),
                 Text(
-                  'İlerleme & Log',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Logları kopyala butonu
-                if (provider.logs.isNotEmpty)
-                  IconButton(
-                    icon: Icon(Icons.copy_rounded, size: 18,
-                        color: theme.colorScheme.onSurfaceVariant),
-                    tooltip: 'Tüm logları kopyala',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () {
-                      final allLogs = provider.logs.join('\n');
-                      Clipboard.setData(ClipboardData(text: allLogs));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Loglar panoya kopyalandı'),
-                          behavior: SnackBarBehavior.floating,
-                          duration: const Duration(seconds: 2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                const Spacer(),
-                // Durum etiketi
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 14, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        statusLabel,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: statusColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // İlerleme yüzdesi
-                Text(
-                  '${provider.sentCount} / ${provider.phoneCount}  •  %$progressPercent',
-                  style: const TextStyle(
-                    fontSize: 13,
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    fontFamily: 'monospace',
+                    color: statusColor,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            '${provider.sentCount} / ${provider.phoneCount}  •  %$progressPercent',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
 
             // Progress bar
             ClipRRect(
@@ -136,8 +118,8 @@ class ProgressLogPanel extends StatelessWidget {
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(
                   provider.status == SendingStatus.completed
-                      ? Colors.green
-                      : theme.colorScheme.primary,
+                      ? WAColors.accent
+                      : WAColors.accentDark,
                 ),
               ),
             ),
@@ -219,9 +201,9 @@ class ProgressLogPanel extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade700),
+                  color: const Color(0xFF111B21),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2A3942)),
                 ),
                 child: provider.logs.isEmpty
                     ? const Center(
@@ -276,7 +258,6 @@ class ProgressLogPanel extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

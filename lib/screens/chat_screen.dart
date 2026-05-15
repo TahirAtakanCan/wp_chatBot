@@ -1,16 +1,19 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/conversation.dart';
 import '../models/message.dart';
 import '../services/api_exceptions.dart';
 import '../services/api_service.dart';
+import '../services/chat_media_service.dart';
 import '../theme/wa_colors.dart';
 import '../theme/wa_text_styles.dart';
-import '../widgets/avatar.dart';
 import '../widgets/chat_composer.dart';
+import '../widgets/chat_header_bar.dart';
 import '../widgets/date_separator.dart';
+import '../widgets/chat_wallpaper.dart';
 import '../widgets/message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -31,6 +34,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ApiService _apiService = ApiService();
+  final ChatMediaService _chatMediaService = ChatMediaService();
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _replyController = TextEditingController();
   final FocusNode _replyFocusNode = FocusNode();
@@ -149,6 +153,113 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty || _isSending || _conversation == null) return;
     _replyController.clear();
     await _sendText(text);
+  }
+
+  Future<void> _pickAndSendImage() async {
+    if (_isSending || _conversation == null || !_conversation!.replyWindowOpen) {
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    if (file.bytes == null) {
+      _showSnackBar('Dosya okunamadi');
+      return;
+    }
+
+    final caption = _replyController.text.trim();
+    if (caption.isNotEmpty) {
+      _replyController.clear();
+    }
+
+    setState(() => _isSending = true);
+    try {
+      final publicUrl = await _chatMediaService.uploadPublicImage(
+        bytes: file.bytes!,
+        filename: file.name,
+      );
+      if (!mounted) return;
+      await _sendImage(publicUrl, caption: caption.isEmpty ? null : caption);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSending = false);
+      _showSnackBar('Resim gonderilemedi: $e');
+    }
+  }
+
+  Future<void> _sendImage(
+    String imageUrl, {
+    String? caption,
+    int? replaceMessageId,
+  }) async {
+    if (_conversation == null) return;
+
+    final tempMessage = Message(
+      id: replaceMessageId ?? -DateTime.now().microsecondsSinceEpoch,
+      direction: 'OUTBOUND',
+      messageType: 'IMAGE',
+      content: caption,
+      caption: caption,
+      mediaUrl: imageUrl,
+      url: imageUrl,
+      waMessageId: null,
+      sentAt: DateTime.now(),
+      status: 'PENDING',
+    );
+
+    setState(() {
+      _isSending = true;
+      if (replaceMessageId != null) {
+        final idx = _messages.indexWhere((m) => m.id == replaceMessageId);
+        if (idx >= 0) {
+          _messages[idx] = tempMessage;
+        }
+      } else {
+        _messages = <Message>[..._messages, tempMessage];
+      }
+      _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    });
+
+    _scrollToBottom();
+
+    try {
+      final sent = await _apiService.sendReplyImage(
+        _conversation!.id,
+        imageUrl: imageUrl,
+        caption: caption,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == tempMessage.id);
+        if (idx >= 0) {
+          _messages[idx] = sent;
+        } else {
+          _messages = <Message>[..._messages, sent];
+        }
+        _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      });
+      _scrollToBottom();
+    } on ReplyWindowClosedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Pencere kapali, sayfayi yenileyin');
+    } on RateLimitedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Hiz limiti, biraz sonra deneyin');
+    } catch (e) {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Gonderilemedi: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
   }
 
   Future<void> _sendText(String text, {int? replaceMessageId}) async {
@@ -421,6 +532,7 @@ class _ChatScreenState extends State<ChatScreen> {
               focusNode: _replyFocusNode,
               isSending: _isSending,
               onSend: _sendReply,
+              onAttachImage: _pickAndSendImage,
               onTemplatePressed: () {
                 _showSnackBar('Yakında: template gönderimi');
               },
@@ -438,16 +550,14 @@ class _ChatScreenState extends State<ChatScreen> {
       },
       child: Scaffold(
         backgroundColor: WAColors.chatPanelBg,
-        appBar: AppBar(
-          backgroundColor: WAColors.leftPanelHeader,
-          toolbarHeight: 60,
-          leading: IconButton(
-            onPressed: () => Navigator.of(context).pop(conversation),
-            icon: const Icon(Icons.arrow_back),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(64),
+          child: ChatHeaderBar(
+            conversation: conversation,
+            showBack: true,
+            onBack: () => Navigator.of(context).pop(conversation),
+            actions: _buildHeaderActions(),
           ),
-          titleSpacing: 0,
-          title: _buildHeaderContent(conversation),
-          actions: _buildHeaderActions(),
         ),
         body: Column(
           children: [
@@ -460,6 +570,7 @@ class _ChatScreenState extends State<ChatScreen> {
               focusNode: _replyFocusNode,
               isSending: _isSending,
               onSend: _sendReply,
+              onAttachImage: _pickAndSendImage,
               onTemplatePressed: () {
                 _showSnackBar('Yakında: template gönderimi');
               },
@@ -471,106 +582,70 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildEmbeddedHeader(Conversation conversation) {
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        color: WAColors.leftPanelHeader,
-        border: Border(
-          bottom: BorderSide(color: WAColors.divider),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: 'Geri',
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back, size: 24),
-            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-            splashRadius: 20,
-          ),
-          Avatar(
-            name: conversation.contactName,
-            phoneNumber: conversation.phoneNumber,
-            radius: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: _buildHeaderTitle(conversation)),
-          IconButton(
-            tooltip: 'Ara',
-            onPressed: () => _showSnackBar('Yakında: mesaj arama'),
-            icon: const Icon(Icons.search, size: 24),
-            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-            splashRadius: 20,
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'close') {
-                _closeConversation();
-              }
-              if (value == 'contact_card') {
-                _confirmSendContactCard();
-              }
-              if (value == 'clear_messages') {
-                _confirmClearMessages();
-              }
-              if (value == 'info') {
-                _showSnackBar('Yakında: bilgiler');
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'close',
-                child: Text('Konuşmayı Kapat'),
-              ),
-              PopupMenuItem<String>(
-                value: 'contact_card',
-                child: Text('Kişi Kartı Gönder'),
-              ),
-              PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'clear_messages',
-                child: Text('Mesajları Temizle',
-                    style: TextStyle(color: Colors.red)),
-              ),
-              PopupMenuItem<String>(
-                value: 'info',
-                child: Text('Bilgileri görüntüle'),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return ChatHeaderBar(
+      conversation: conversation,
+      showBack: true,
+      onBack: () => Navigator.of(context).maybePop(),
+      actions: _buildHeaderActions(),
     );
   }
 
   Widget _buildMessageList() {
-    if (_isLoading && _messages.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    if (_messages.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 40,
-              color: WAColors.textTertiary,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ChatWallpaper(),
+        if (_isLoading && _messages.isEmpty)
+          const Center(child: CircularProgressIndicator())
+        else if (_messages.isEmpty)
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 44,
+                    color: WAColors.accent,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Henüz mesaj yok',
+                    style: WATextStyles.emptySubtitle,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'İlk mesajı aşağıdan gönderebilirsiniz',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: WAColors.textTertiary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 8),
-            Text(
-              'Henüz mesaj yok',
-              style: WATextStyles.emptySubtitle,
-            ),
-          ],
-        ),
-      );
-    }
+          )
+        else
+          _buildMessageScrollView(),
+      ],
+    );
+  }
 
+  Widget _buildMessageScrollView() {
     final items = _buildMessageItems(_messages);
 
     return LayoutBuilder(
@@ -618,9 +693,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: MessageBubble(
                 message: message,
                 isFirstInGroup: isFirstInGroup,
-                onImageTap: message.messageType.toUpperCase() == 'IMAGE'
-                    ? () => _showSnackBar('Yakında: medya görüntüleme')
-                    : null,
+                onImageTap: null,
                 onRetry: message.status.toUpperCase() == 'FAILED'
                     ? () {
                         final content = message.content?.trim() ?? '';
@@ -640,56 +713,13 @@ class _ChatScreenState extends State<ChatScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Widget _buildHeaderContent(Conversation conversation) {
-    return Row(
-      children: [
-        Avatar(
-          name: conversation.contactName,
-          phoneNumber: conversation.phoneNumber,
-          radius: 20,
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: _buildHeaderTitle(conversation)),
-      ],
-    );
-  }
-
-  Widget _buildHeaderTitle(Conversation conversation) {
-    final isActive = conversation.replyWindowOpen;
-    final dotColor = isActive ? WAColors.accent : WAColors.warningYellow;
-    final statusText = isActive ? 'Aktif' : '24 saat penceresi kapalı';
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(conversation.displayName, style: WATextStyles.chatTitle),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(statusText, style: WATextStyles.chatSubtitle),
-          ],
-        ),
-      ],
-    );
-  }
-
   List<Widget> _buildHeaderActions() {
     return [
       IconButton(
         tooltip: 'Ara',
         onPressed: () => _showSnackBar('Yakında: mesaj arama'),
-        icon: const Icon(Icons.search, size: 24),
-        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+        icon: const Icon(Icons.search_rounded, size: 22),
+        constraints: const BoxConstraints.tightFor(width: 44, height: 44),
         splashRadius: 20,
       ),
       PopupMenuButton<String>(

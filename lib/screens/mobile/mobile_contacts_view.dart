@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/contact_model.dart';
 import '../../models/delivery_record.dart';
-import '../../widgets/delivery_status_icon.dart';
+import '../../theme/wa_colors.dart';
+import '../../widgets/contact_row.dart';
 
 class MobileContactsView extends StatelessWidget {
   final List<ContactModel> contacts;
@@ -49,8 +50,10 @@ class MobileContactsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: WAColors.appBackground,
       appBar: AppBar(
-        title: Text('Kisi Rehberi${selectedCount > 0 ? ' ($selectedCount)' : ''}'),
+        backgroundColor: WAColors.leftPanelHeader,
+        title: Text('Kişi Rehberi${selectedCount > 0 ? ' ($selectedCount seçili)' : ''}'),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -151,41 +154,18 @@ class MobileContactsView extends StatelessWidget {
                 : contacts.isEmpty
                     ? const Center(child: Text('Kisi bulunamadi.'))
                     : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: contacts.length,
                         itemBuilder: (context, index) {
                           final contact = contacts[index];
-                          final selected = selectedContactIds.contains(contact.id);
-                          final status = statusByPhone[contact.phone];
-                          final initials = contact.name.isNotEmpty
-                              ? contact.name.trimLeft()[0].toUpperCase()
-                              : '?';
-
-                          return SizedBox(
-                            height: 72,
-                            child: ListTile(
-                              onLongPress: () => onContactLongPress(contact),
-                              leading: CircleAvatar(
-                                radius: 20,
-                                child: Text(initials),
-                              ),
-                              title: Text(
-                                contact.name.isNotEmpty ? contact.name : '—',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(contact.phone),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  DeliveryStatusIcon(status: status),
-                                  const SizedBox(width: 4),
-                                  Checkbox(
-                                    value: selected,
-                                    onChanged: (val) => onToggleContact(contact, val),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          final selected =
+                              selectedContactIds.contains(contact.id);
+                          return ContactRow(
+                            contact: contact,
+                            selected: selected,
+                            deliveryStatus: statusByPhone[contact.phone],
+                            onSelected: (val) => onToggleContact(contact, val),
+                            onLongPress: () => onContactLongPress(contact),
                           );
                         },
                       ),

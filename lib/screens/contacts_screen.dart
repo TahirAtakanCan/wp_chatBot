@@ -9,7 +9,8 @@ import '../models/delivery_record.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/contact_service.dart';
-import '../widgets/delivery_status_icon.dart';
+import '../theme/wa_colors.dart';
+import '../widgets/contact_row.dart';
 import '../widgets/responsive_layout.dart';
 import 'mobile/mobile_contacts_view.dart';
 
@@ -32,7 +33,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
   List<ContactModel> _contacts = [];
   List<ContactModel> _filteredContacts = [];
   Set<int> _selectedContactIds = {};
-  bool _autoSelect = true;
   bool _loading = false;
   bool _syncing = false;
   String _searchQuery = '';
@@ -104,12 +104,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
     return result;
   }
 
-  void _updateFilteredAndAutoSelect() {
+  void _applyListFilter({bool scrollToTop = false}) {
     _filteredContacts = _applyFilters();
-    if (_autoSelect) {
-      _selectedContactIds = _filteredContacts.map((c) => c.id).toSet();
-    }
     _scheduleStatusLookup();
+    if (scrollToTop && _listController.hasClients) {
+      _listController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   // ─── VERİ ÇEKME ───────────────────────────────────────────────
@@ -191,28 +195,25 @@ class _ContactsScreenState extends State<ContactsScreen> {
   void _onSearchChanged(String value) {
     setState(() {
       _searchQuery = value;
-      _updateFilteredAndAutoSelect();
+      _applyListFilter();
     });
   }
 
   // ─── SEÇİM ────────────────────────────────────────────────────
   void _onSelectAll() {
     setState(() {
-      _autoSelect = true;
       _selectedContactIds = _filteredContacts.map((c) => c.id).toSet();
     });
   }
 
   void _onDeselectAll() {
     setState(() {
-      _autoSelect = false;
       _selectedContactIds.clear();
     });
   }
 
   void _onToggleContact(ContactModel contact, bool? val) {
     setState(() {
-      _autoSelect = false;
       if (val == true) {
         _selectedContactIds.add(contact.id);
       } else {
@@ -221,23 +222,36 @@ class _ContactsScreenState extends State<ContactsScreen> {
     });
   }
 
-  // ─── HARF FİLTRESİ ────────────────────────────────────────────
+  // ─── HARF FİLTRESİ (yalnizca listeyi daraltir, secimi degistirmez) ──
   void _onLetterTap(String letter) {
     setState(() {
       if (letter == 'Tümü') {
         _selectedLetters = {'Tümü'};
+      } else if (_selectedLetters.contains(letter) &&
+          !_selectedLetters.contains('Tümü')) {
+        _selectedLetters = {'Tümü'};
       } else {
-        _selectedLetters.remove('Tümü');
-        if (_selectedLetters.contains(letter)) {
-          _selectedLetters.remove(letter);
-          if (_selectedLetters.isEmpty) _selectedLetters = {'Tümü'};
-        } else {
-          _selectedLetters.add(letter);
-        }
+        _selectedLetters = {letter};
       }
-      _autoSelect = true; // Harf seçince otomatik seçim aktif
-      _updateFilteredAndAutoSelect();
+      _applyListFilter();
     });
+    if (_listController.hasClients) {
+      _listController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  String? get _activeLetterFilter {
+    if (_selectedLetters.contains('Tümü') || _selectedLetters.isEmpty) {
+      return null;
+    }
+    if (_selectedLetters.length == 1) {
+      return _selectedLetters.first;
+    }
+    return '${_selectedLetters.length} harf';
   }
 
   // ─── KİŞİ SİL ─────────────────────────────────────────────────
@@ -413,11 +427,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   Widget _buildDesktopView(BuildContext context, int selectedCount) {
     return Scaffold(
+      backgroundColor: WAColors.appBackground,
       appBar: AppBar(
-        title: Text('Kişi Rehberi${selectedCount > 0 ? ' ($selectedCount seçili)' : ''}'),
+        backgroundColor: WAColors.leftPanelHeader,
+        title: Text(
+          'Kişi Rehberi${selectedCount > 0 ? ' ($selectedCount seçili)' : ''}',
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.link_off),
+            icon: const Icon(Icons.link_off_rounded),
             tooltip: 'Sheets URL\'yi Sıfırla',
             onPressed: _resetSheetUrl,
           ),
@@ -425,67 +443,129 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+          Container(
+            color: WAColors.leftPanelHeader,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
               children: [
-                // Tümünü Seç / Seçimi Temizle
                 Row(
                   children: [
-                    ElevatedButton.icon(
+                    OutlinedButton.icon(
+                      onPressed: _onSelectAll,
                       icon: const Icon(Icons.select_all, size: 18),
                       label: const Text('Tümünü Seç'),
-                      onPressed: _onSelectAll,
                     ),
                     const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.clear_all, size: 18),
-                      label: const Text('Seçimi Temizle'),
+                    OutlinedButton.icon(
                       onPressed: _onDeselectAll,
+                      icon: const Icon(Icons.clear_all, size: 18),
+                      label: const Text('Temizle'),
+                    ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: WAColors.accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${_filteredContacts.length} kişi',
+                            style: const TextStyle(
+                              color: WAColors.accent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (_activeLetterFilter != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _activeLetterFilter == 'İsimsiz'
+                                ? 'İsimsiz kayıtlar'
+                                : '"$_activeLetterFilter" ile başlayanlar',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: WAColors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-
-                // Harf filtresi
+                const SizedBox(height: 10),
+                Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: WAColors.divider),
+                  ),
+                  child: TextField(
+                    onChanged: _onSearchChanged,
+                    decoration: const InputDecoration(
+                      hintText: 'İsim veya telefon ara...',
+                      prefixIcon: Icon(Icons.search_rounded),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 SizedBox(
-                  height: 38,
-                  child: ListView.builder(
+                  height: 36,
+                  child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _letters.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 6),
                     itemBuilder: (context, index) {
                       final letter = _letters[index];
                       final isSelected = _selectedLetters.contains(letter);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: FilterChip(
-                          label: Text(letter, style: const TextStyle(fontSize: 12)),
-                          selected: isSelected,
-                          onSelected: (_) => _onLetterTap(letter),
-                          selectedColor: Theme.of(context).colorScheme.primaryContainer,
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => _onLetterTap(letter),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? WAColors.accent
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: isSelected
+                                    ? WAColors.accent
+                                    : WAColors.divider,
+                              ),
+                            ),
+                            child: Text(
+                              letter,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : WAColors.textSecondary,
+                              ),
+                            ),
+                          ),
                         ),
                       );
                     },
                   ),
                 ),
-                const SizedBox(height: 8),
-
-                // Arama kutusu
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'Ara',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: _onSearchChanged,
-                ),
               ],
             ),
           ),
-
-          // Kişi listesi
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -493,57 +573,89 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     ? const Center(child: Text('Kişi bulunamadı.'))
                     : ListView.builder(
                         controller: _listController,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: _filteredContacts.length,
                         itemBuilder: (context, index) {
                           final contact = _filteredContacts[index];
-                          final selected = _selectedContactIds.contains(contact.id);
-                          final status = _deliveryStatusByPhone[contact.phone];
-                          return ListTile(
-                            dense: true,
+                          final selected =
+                              _selectedContactIds.contains(contact.id);
+                          return ContactRow(
+                            contact: contact,
+                            selected: selected,
+                            deliveryStatus:
+                                _deliveryStatusByPhone[contact.phone],
+                            onSelected: (val) =>
+                                _onToggleContact(contact, val),
                             onLongPress: () => _onContactLongPress(contact),
-                            leading: Checkbox(
-                              value: selected,
-                              onChanged: (val) => _onToggleContact(contact, val),
-                            ),
-                            title: Text(contact.name.isNotEmpty ? contact.name : '—'),
-                            subtitle: Text(contact.phone),
-                            trailing: DeliveryStatusIcon(status: status),
                           );
                         },
                       ),
           ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'syncSheets',
-            backgroundColor: Colors.green.shade700,
-            icon: _syncing
-                ? const SizedBox(
-                    width: 18, height: 18,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
-            label: Text(_syncing ? 'Güncelleniyor...' : 'Sheets\'ten Güncelle'),
-            onPressed: _syncing ? null : _syncFromSheets,
-          ),
-          const SizedBox(height: 12),
-          FloatingActionButton.extended(
-            heroTag: 'addSelected',
-            icon: const Icon(Icons.person_add),
-            label: Text('Seçilenleri Ekle ($selectedCount)'),
-            onPressed: _onAddSelected,
-          ),
-          const SizedBox(height: 12),
-          FloatingActionButton.extended(
-            heroTag: 'deleteAll',
-            backgroundColor: Colors.red,
-            icon: const Icon(Icons.delete_forever),
-            label: const Text('Rehberi Sil'),
-            onPressed: _deleteAllContacts,
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: WAColors.divider)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _syncing ? null : _syncFromSheets,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: WAColors.accent,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: _syncing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.sync_rounded),
+                    label: Text(
+                      _syncing ? 'Güncelleniyor...' : "Sheets'ten Güncelle",
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _onAddSelected,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: WAColors.accentDark,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(Icons.person_add_rounded),
+                    label: Text('Ekle ($selectedCount)'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: _deleteAllContacts,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: WAColors.errorRed,
+                    side: const BorderSide(color: WAColors.errorRed),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: const Text('Sil'),
+                ),
+              ],
+            ),
           ),
         ],
       ),

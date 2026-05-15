@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/message_provider.dart';
 import '../models/sending_state.dart';
+import '../providers/message_provider.dart';
+import '../theme/wa_colors.dart';
 
 class ActionPanel extends StatelessWidget {
   final bool compact;
@@ -99,8 +100,19 @@ class ActionPanel extends StatelessWidget {
       );
     }
 
-    return Card(
-      elevation: 1,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: WAColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
@@ -115,11 +127,11 @@ class ActionPanel extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  disabledBackgroundColor: Colors.green.shade200,
+                  backgroundColor: WAColors.accent,
+                  disabledBackgroundColor: WAColors.accent.withValues(alpha: 0.3),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),

@@ -9,6 +9,7 @@ class ChatComposer extends StatefulWidget {
   final FocusNode focusNode;
   final bool isSending;
   final Future<void> Function() onSend;
+  final Future<void> Function()? onAttachImage;
   final VoidCallback onTemplatePressed;
 
   const ChatComposer({
@@ -18,6 +19,7 @@ class ChatComposer extends StatefulWidget {
     required this.focusNode,
     required this.isSending,
     required this.onSend,
+    this.onAttachImage,
     required this.onTemplatePressed,
   });
 
@@ -71,99 +73,54 @@ class _ChatComposerState extends State<ChatComposer>
   @override
   Widget build(BuildContext context) {
     final isEnabled = widget.enabled && !widget.isSending;
-    final inputBackground = widget.enabled
-        ? WAColors.inputBg
-        : WAColors.inputBg.withValues(alpha: 0.7);
     final hintText = widget.enabled
         ? 'Bir mesaj yazın'
-        : '24 saat penceresi kapalı, mesaj gönderilemez';
+        : '24 saat penceresi kapalı';
     final canSend = isEnabled && _hasText;
 
-    return Material(
-      type: MaterialType.transparency,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        decoration: const BoxDecoration(
-          color: WAColors.composerBg,
-          border: Border(
-            top: BorderSide(color: WAColors.divider),
-          ),
-        ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!widget.enabled)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: WAColors.warningBg,
-                  borderRadius: BorderRadius.circular(10),
+            if (!widget.enabled) _buildWindowClosedBanner(),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: WAColors.divider.withValues(alpha: 0.8),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Icon(
-                        Icons.info_outline,
-                        size: 18,
-                        color: WAColors.warningYellow,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Bu kişiye 24 saatten fazladır mesaj gönderilmemiş. Yalnızca onaylı template ile iletişim kurabilirsiniz.',
-                        style: TextStyle(fontSize: 12, color: WAColors.textSecondary),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: widget.onTemplatePressed,
-                      style: TextButton.styleFrom(
-                        foregroundColor: WAColors.accent,
-                      ),
-                      child: const Text('Template Gönder'),
-                    ),
-                  ],
-                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: isEnabled
-                      ? () => _showSnack('Yakında: emoji')
-                      : null,
-                  icon: const Icon(
-                    Icons.emoji_emotions_outlined,
-                    color: WAColors.textSecondary,
-                    size: 24,
+              padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _buildIconAction(
+                    icon: Icons.emoji_emotions_outlined,
+                    onPressed: isEnabled ? () => _showSnack('Yakında: emoji') : null,
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: isEnabled
-                      ? () => _showSnack('Yakında: dosya')
-                      : null,
-                  icon: const Icon(
-                    Icons.attach_file,
-                    color: WAColors.textSecondary,
-                    size: 24,
+                  _buildIconAction(
+                    icon: Icons.image_outlined,
+                    onPressed: isEnabled && widget.onAttachImage != null
+                        ? () => widget.onAttachImage!()
+                        : null,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    constraints: const BoxConstraints(minHeight: 40, maxHeight: 120),
-                    decoration: BoxDecoration(
-                      color: inputBackground,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
+                  Expanded(
                     child: Focus(
                       onKeyEvent: (node, event) {
-                        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                        if (event is! KeyDownEvent) {
+                          return KeyEventResult.ignored;
+                        }
                         if (event.logicalKey == LogicalKeyboardKey.enter) {
                           if (HardwareKeyboard.instance.isShiftPressed) {
                             return KeyEventResult.ignored;
@@ -183,70 +140,150 @@ class _ChatComposerState extends State<ChatComposer>
                         textInputAction: TextInputAction.newline,
                         minLines: 1,
                         maxLines: 5,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: WAColors.textPrimary,
+                        ),
                         decoration: InputDecoration(
                           hintText: hintText,
+                          hintStyle: const TextStyle(
+                            color: WAColors.textTertiary,
+                            fontSize: 15,
+                          ),
                           border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                          isDense: true,
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTapDown: (_) {
-                    if (isEnabled) {
-                      setState(() {
-                        _pressed = true;
-                      });
-                    }
-                  },
-                  onTapUp: (_) {
-                    if (isEnabled) {
-                      setState(() {
-                        _pressed = false;
-                      });
-                    }
-                  },
-                  onTapCancel: () {
-                    if (isEnabled) {
-                      setState(() {
-                        _pressed = false;
-                      });
-                    }
-                  },
-                  onTap: () {
-                    if (!isEnabled) return;
-                    if (_hasText) {
-                      widget.onSend();
-                    } else {
-                      _showSnack('Yakında: ses kaydı');
-                    }
-                  },
-                  child: AnimatedScale(
-                    scale: _pressed ? 0.95 : 1.0,
-                    duration: const Duration(milliseconds: 120),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: !isEnabled
-                            ? WAColors.divider
-                            : (_hasText ? WAColors.accent : WAColors.composerBg),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _hasText ? Icons.send : Icons.mic,
-                        size: 20,
-                        color: !isEnabled
-                            ? WAColors.textTertiary
-                            : (_hasText ? Colors.white : WAColors.textSecondary),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                  _buildSendButton(isEnabled, canSend),
+                ],
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWindowClosedBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: WAColors.warningBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: WAColors.warningYellow.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.schedule_rounded,
+            size: 18,
+            color: WAColors.warningYellow,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              '24 saat penceresi kapalı. Yalnızca onaylı template ile yazabilirsiniz.',
+              style: TextStyle(fontSize: 12, color: WAColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: widget.onTemplatePressed,
+            style: TextButton.styleFrom(
+              foregroundColor: WAColors.accent,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Template'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIconAction({
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 22),
+      color: WAColors.textSecondary,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+      splashRadius: 20,
+    );
+  }
+
+  Widget _buildSendButton(bool isEnabled, bool canSend) {
+    final showSend = _hasText;
+    final bgColor = !isEnabled
+        ? WAColors.divider
+        : (showSend ? WAColors.accent : WAColors.composerBg);
+    final iconColor = !isEnabled
+        ? WAColors.textTertiary
+        : (showSend ? Colors.white : WAColors.textSecondary);
+
+    return GestureDetector(
+      onTapDown: (_) {
+        if (isEnabled) setState(() => _pressed = true);
+      },
+      onTapUp: (_) {
+        if (isEnabled) setState(() => _pressed = false);
+      },
+      onTapCancel: () {
+        if (isEnabled) setState(() => _pressed = false);
+      },
+      onTap: () {
+        if (!isEnabled) return;
+        if (_hasText) {
+          widget.onSend();
+        } else {
+          _showSnack('Yakında: ses kaydı');
+        }
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.92 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: bgColor,
+            shape: BoxShape.circle,
+            boxShadow: showSend && isEnabled
+                ? [
+                    BoxShadow(
+                      color: WAColors.accent.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: widget.isSending
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Icon(
+                  showSend ? Icons.send_rounded : Icons.mic_rounded,
+                  size: 20,
+                  color: iconColor,
+                ),
         ),
       ),
     );

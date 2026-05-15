@@ -28,6 +28,18 @@ class ApiService {
     return _conversationService.sendReply(conversationId, text);
   }
 
+  Future<Message> sendReplyImage(
+    int conversationId, {
+    required String imageUrl,
+    String? caption,
+  }) {
+    return _conversationService.sendReplyImage(
+      conversationId,
+      imageUrl: imageUrl,
+      caption: caption,
+    );
+  }
+
   Future<Message> sendContactCard(int conversationId) {
     return _conversationService.sendContactCard(conversationId);
   }
@@ -76,5 +88,9 @@ class ApiService {
 
   Future<Map<String, int>> getDeliveryStats() {
     return _deliveryService.getStats();
+  }
+
+  Future<int> purgeOldDeliveries({int days = 2}) {
+    return _deliveryService.purgeOlderThan(days: days);
   }
 }

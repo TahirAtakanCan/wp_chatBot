@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/template_model.dart';
 import '../providers/message_provider.dart';
 import '../services/template_service.dart';
+import '../theme/wa_colors.dart';
+import 'home_panel_card.dart';
 
 class MessageContentPanel extends StatefulWidget {
   const MessageContentPanel({super.key});
@@ -142,71 +144,44 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
     final provider = context.watch<MessageProvider>();
     final theme = Theme.of(context);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+    return HomePanelCard(
+      title: 'Mesaj İçeriği',
+      icon: Icons.chat_bubble_outline_rounded,
+      headerTrailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (provider.messagePartCount > 1)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: WAColors.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${provider.messagePartCount} parça',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: WAColors.accent,
+                ),
+              ),
+            ),
+          OutlinedButton.icon(
+            onPressed: () => _showTemplateBottomSheet(context),
+            icon: const Icon(Icons.bookmark_outline_rounded, size: 18),
+            label: const Text('Şablon Seç'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: WAColors.accent,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Başlık ──
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer
-                        .withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.chat_bubble_outline_rounded,
-                      size: 18, color: theme.colorScheme.primary),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Mesaj İçeriği',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                if (provider.messagePartCount > 1) ...[
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.tertiaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${provider.messagePartCount} parça',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onTertiaryContainer,
-                      ),
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: () => _showTemplateBottomSheet(context),
-                  icon: const Icon(Icons.bookmark_outline, size: 18),
-                  label: const Text('Şablon Seç'),
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
             // ── Kişiselleştirme Toggle ──
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
@@ -456,7 +431,6 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
             ),
           ],
         ),
-      ),
     );
   }
 }

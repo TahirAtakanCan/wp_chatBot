@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/wa_colors.dart';
 import '../theme/wa_text_styles.dart';
 import '../utils/date_format.dart';
 
@@ -38,15 +37,18 @@ class _DateSeparatorState extends State<DateSeparator> {
       child: Center(
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
-            color: WAColors.dateChipBg,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: const [
+            color: Colors.white.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.black.withValues(alpha: 0.06),
+            ),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 2,
-                offset: Offset(0, 1),
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),

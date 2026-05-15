@@ -4,6 +4,7 @@ class Conversation {
   final String? contactName;
   final DateTime lastMessageAt;
   final String? lastMessageText;
+  final String? lastMessageType;
   final int unreadCount;
   final String status;
   final bool replyWindowOpen;
@@ -14,6 +15,7 @@ class Conversation {
     this.contactName,
     required this.lastMessageAt,
     this.lastMessageText,
+    this.lastMessageType,
     required this.unreadCount,
     required this.status,
     required this.replyWindowOpen,
@@ -31,6 +33,8 @@ class Conversation {
       contactName: json['contactName']?.toString(),
       lastMessageAt: DateTime.parse(rawLastMessageAt),
       lastMessageText: json['lastMessageText']?.toString(),
+      lastMessageType: json['lastMessageType']?.toString() ??
+          json['last_message_type']?.toString(),
       unreadCount: _toInt(json['unreadCount']),
       status: (json['status'] ?? 'OPEN').toString(),
       replyWindowOpen: _toBool(json['replyWindowOpen']),

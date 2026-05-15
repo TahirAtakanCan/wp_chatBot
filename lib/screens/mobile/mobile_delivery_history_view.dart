@@ -11,6 +11,7 @@ class MobileDeliveryHistoryView extends StatelessWidget {
   final DeliveryStatus? filterStatus;
   final String sortKey;
   final ScrollController scrollController;
+  final String? purgeMessage;
   final VoidCallback onRefresh;
   final ValueChanged<DeliveryStatus?> onFilterChanged;
   final ValueChanged<String> onSortChanged;
@@ -26,6 +27,7 @@ class MobileDeliveryHistoryView extends StatelessWidget {
     required this.filterStatus,
     required this.sortKey,
     required this.scrollController,
+    this.purgeMessage,
     required this.onRefresh,
     required this.onFilterChanged,
     required this.onSortChanged,
@@ -53,6 +55,14 @@ class MobileDeliveryHistoryView extends StatelessWidget {
       ),
       body: Column(
         children: [
+          if (purgeMessage != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                purgeMessage!,
+                style: const TextStyle(fontSize: 12, color: Colors.green),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: _StatsGrid(

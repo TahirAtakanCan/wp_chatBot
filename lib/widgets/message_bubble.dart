@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../theme/wa_colors.dart';
 import '../theme/wa_text_styles.dart';
+import '../utils/message_media_url.dart';
+import '../utils/message_text_utils.dart';
+import 'message_media_content.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -25,6 +28,7 @@ class MessageBubble extends StatelessWidget {
     final background =
         isInbound ? WAColors.bubbleInbound : WAColors.bubbleOutbound;
     final status = message.status.toUpperCase();
+    final isMedia = _isMediaMessage(message);
 
     return Align(
       alignment: alignment,
@@ -38,15 +42,25 @@ class MessageBubble extends StatelessWidget {
               maxWidth: maxWidth * widthFactor,
             ),
             child: Container(
-              padding: const EdgeInsets.fromLTRB(9, 6, 9, 8),
+              padding: EdgeInsets.fromLTRB(
+                isMedia ? 6 : 12,
+                isMedia ? 6 : 8,
+                isMedia ? 6 : 12,
+                6,
+              ),
               decoration: BoxDecoration(
                 color: background,
                 borderRadius: _bubbleRadius(isInbound, isFirstInGroup),
-                boxShadow: const [
+                border: isInbound
+                    ? Border.all(
+                        color: Colors.black.withValues(alpha: 0.06),
+                      )
+                    : null,
+                boxShadow: [
                   BoxShadow(
-                    color: WAColors.bubbleShadow,
-                    blurRadius: 0.5,
-                    offset: Offset(0, 1),
+                    color: Colors.black.withValues(alpha: isInbound ? 0.05 : 0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -106,47 +120,66 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  bool _isMediaMessage(Message message) {
+    final type = message.messageType.toUpperCase();
+    if (type == 'IMAGE' ||
+        type == 'STICKER' ||
+        type == 'VIDEO' ||
+        type == 'AUDIO' ||
+        type == 'VOICE' ||
+        type == 'DOCUMENT') {
+      return true;
+    }
+    return isMediaPlaceholderContent(message.content) &&
+        resolveMessageMediaUrl(message) != null;
+  }
+
   Widget _buildContent(BuildContext context) {
     final messageType = message.messageType.toUpperCase();
-    if (messageType == 'IMAGE') {
-      return InkWell(
-        onTap: onImageTap,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.image_outlined, size: 32, color: WAColors.textSecondary),
-            SizedBox(width: 8),
-            Text('Resim', style: WATextStyles.messageBody),
-          ],
-        ),
-      );
+
+    if (messageType == 'IMAGE' ||
+        messageType == 'STICKER' ||
+        messageType == 'VIDEO' ||
+        messageType == 'AUDIO' ||
+        messageType == 'VOICE' ||
+        messageType == 'DOCUMENT') {
+      return MessageMediaContent(message: message, onTap: onImageTap);
+    }
+
+    if (isMediaPlaceholderContent(message.content) &&
+        resolveMessageMediaUrl(message) != null) {
+      return MessageMediaContent(message: message, onTap: onImageTap);
     }
 
     return Text(
-      (message.content ?? '').trim(),
+      normalizeMessageContent(message.content),
       style: WATextStyles.messageBody,
     );
   }
 
   BorderRadius _bubbleRadius(bool isInbound, bool isFirst) {
+    const grouped = 14.0;
+    const tail = 4.0;
+    const corner = 18.0;
+
     if (!isFirst) {
-      return BorderRadius.circular(8);
+      return BorderRadius.circular(grouped);
     }
 
     if (isInbound) {
       return const BorderRadius.only(
-        topLeft: Radius.circular(8),
-        topRight: Radius.circular(8),
-        bottomRight: Radius.circular(8),
-        bottomLeft: Radius.circular(2),
+        topLeft: Radius.circular(corner),
+        topRight: Radius.circular(corner),
+        bottomRight: Radius.circular(corner),
+        bottomLeft: Radius.circular(tail),
       );
     }
 
     return const BorderRadius.only(
-      topLeft: Radius.circular(8),
-      topRight: Radius.circular(8),
-      bottomRight: Radius.circular(2),
-      bottomLeft: Radius.circular(8),
+      topLeft: Radius.circular(corner),
+      topRight: Radius.circular(corner),
+      bottomRight: Radius.circular(tail),
+      bottomLeft: Radius.circular(corner),
     );
   }
 

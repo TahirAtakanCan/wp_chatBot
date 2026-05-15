@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../theme/wa_colors.dart';
 import '../widgets/responsive_layout.dart';
 import 'home_screen.dart';
 import 'mobile/mobile_login_screen.dart';
@@ -70,16 +71,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildDesktopLogin(AuthProvider authProvider) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Center(
-        child: SingleChildScrollView(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFF0F2F5),
+              WAColors.chatPanelBg,
+              Color(0xFFE8F5E9),
+            ],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Card(
-              elevation: 2,
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: WAColors.divider),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -103,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 72,
                             height: 72,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF25D366),
+                              color: WAColors.accent,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Icon(
@@ -120,15 +133,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1B5E20),
+                          color: WAColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
+                      const Text(
                         'Devam etmek için giriş yapın',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: WAColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -226,9 +239,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed:
                               authProvider.isLoading ? null : _handleLogin,
                           style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF25D366),
+                            backgroundColor: WAColors.accent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           child: Text(
@@ -248,6 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
+          ),
           ),
         ),
       ),

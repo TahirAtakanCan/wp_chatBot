@@ -283,25 +283,34 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.all(8),
-      child: SizedBox(
-        height: 40,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: WAColors.inputBg,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: WAColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
         child: TextField(
           onChanged: (value) {
             setState(() {
               _searchQuery = value.trim();
             });
           },
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: WAColors.inputBg,
+          style: const TextStyle(fontSize: 15, color: WAColors.textPrimary),
+          decoration: const InputDecoration(
             hintText: 'Konuşma ara...',
-            prefixIcon: const Icon(Icons.search, color: WAColors.textTertiary),
-            contentPadding: const EdgeInsets.symmetric(vertical: 10),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
+            hintStyle: TextStyle(color: WAColors.textTertiary, fontSize: 15),
+            prefixIcon: Icon(Icons.search_rounded, color: WAColors.textTertiary),
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(vertical: 12),
           ),
         ),
       ),
@@ -310,10 +319,10 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
 
   Widget _buildFilters() {
     return SizedBox(
-      height: 40,
+      height: 44,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
         children: [
           _buildFilterChip('Tümü', _InboxFilter.all),
           const SizedBox(width: 8),
@@ -329,26 +338,44 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
 
   Widget _buildFilterChip(String label, _InboxFilter filter) {
     final isSelected = _activeFilter == filter;
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () {
-        setState(() {
-          _activeFilter = filter;
-        });
-      },
-      child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? WAColors.accent : WAColors.composerBg,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : WAColors.textSecondary,
-            fontWeight: FontWeight.w500,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          setState(() {
+            _activeFilter = filter;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? WAColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? WAColors.accent : WAColors.divider,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: WAColors.accent.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : WAColors.textSecondary,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              fontSize: 13,
+            ),
           ),
         ),
       ),
