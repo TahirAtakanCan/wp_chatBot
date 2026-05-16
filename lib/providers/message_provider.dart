@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
+import '../models/bulk_media_attachment.dart';
 import '../models/sending_state.dart';
 
 class MessageProvider extends ChangeNotifier {
@@ -83,10 +84,18 @@ class MessageProvider extends ChangeNotifier {
   // ==========================================
   // MEDYA SİSTEMİ (URL BAZLI)
   // ==========================================
-  final List<String> _selectedMediaUrls = [];
-  List<String> get attachedMedia => List.unmodifiable(_selectedMediaUrls);
-  int get mediaCount => _selectedMediaUrls.length;
-  bool get hasMedia => _selectedMediaUrls.isNotEmpty;
+  final List<BulkMediaAttachment> _mediaAttachments = [];
+  List<BulkMediaAttachment> get mediaAttachments =>
+      List.unmodifiable(_mediaAttachments);
+  List<String> get attachedMedia =>
+      _mediaAttachments.map((m) => m.url).toList(growable: false);
+  int get mediaCount => _mediaAttachments.length;
+  bool get hasMedia => _mediaAttachments.isNotEmpty;
+  bool get hasNonImageMedia =>
+      _mediaAttachments.any((m) => !m.kind.isTemplateSupported);
+  bool get hasTemplateCompatibleMedia =>
+      _mediaAttachments.isEmpty ||
+      _mediaAttachments.every((m) => m.kind.isTemplateSupported);
 
   // ==========================================
   // BASE64 MEDYA SİSTEMİ
@@ -167,85 +176,52 @@ class MessageProvider extends ChangeNotifier {
     return [];
   }
 
-  Future<bool> uploadMediaFromDevice() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) {
-        _addLog('[BİLGİ] Resim seçimi iptal edildi.');
-        return false;
-      }
-      final file = result.files.first;
-      if (file.bytes == null) {
-        _addLog('[HATA] Dosya okunamadı (Bytes null).');
-        return false;
-      }
-      _addLog('[YÜKLEME] "${file.name}" sunucuya yükleniyor...');
-      notifyListeners();
-
-      final request = http.MultipartRequest(
-          'POST', Uri.parse('$_mediaApiUrl/upload'));
-      final authHeaders = await _getAuthHeaders();
-      request.headers.addAll(authHeaders);
-      request.files.add(http.MultipartFile.fromBytes(
-        'file',
-        file.bytes!,
-        filename: file.name,
-      ));
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
-        String? url;
-        try {
-          final data = jsonDecode(response.body);
-          if (data is Map<String, dynamic>) {
-            url = data['url'] as String?;
-          }
-        } catch (_) {}
-        if (url != null) {
-          addMediaUrl(url);
-          _addLog('[BAŞARILI] Yüklendi → $url');
-          return true;
-        } else {
-          _addLog('[HATA] Resim yüklendi ama geri dönen URL okunamadı.');
-          return false;
-        }
-      } else {
-        _addLog('[HATA] Yükleme başarısız (${response.statusCode})');
-        return false;
-      }
-    } catch (e) {
-      _addLog('[HATA] Yükleme sırasında kritik hata: $e');
-      notifyListeners();
-      return false;
-    }
-  }
-
-  void addMediaUrl(String url) {
-    if (!_selectedMediaUrls.contains(url)) {
-      _selectedMediaUrls.add(url);
-      _addLog('[BİLGİ] Medya mesaja eklendi: ${url.split('/').last}');
-      notifyListeners();
-    }
+  void addMediaAttachment(BulkMediaAttachment attachment) {
+    _mediaAttachments
+      ..clear()
+      ..add(attachment);
+    _addLog(
+      '[BAŞARILI] ${attachment.kind.apiValue} eklendi: ${attachment.filename}',
+    );
+    notifyListeners();
   }
 
   void removeMedia(int index) {
-    if (index >= 0 && index < _selectedMediaUrls.length) {
-      final removed = _selectedMediaUrls.removeAt(index);
-      _addLog('[BİLGİ] "${removed.split('/').last}" kaldırıldı.');
+    if (index >= 0 && index < _mediaAttachments.length) {
+      final removed = _mediaAttachments.removeAt(index);
+      _addLog('[BİLGİ] "${removed.filename}" kaldırıldı.');
       notifyListeners();
     }
   }
 
   void clearAllMedia() {
-    _selectedMediaUrls.clear();
+    _mediaAttachments.clear();
     _addLog('[BİLGİ] Tüm medya dosyaları kaldırıldı.');
     notifyListeners();
+  }
+
+  List<Map<String, dynamic>> _buildMediaPayload() {
+    return _mediaAttachments
+        .map(
+          (m) => {
+            'url': m.url,
+            'type': m.kind.apiValue,
+            'fileName': m.filename,
+            'size': m.sizeBytes,
+          },
+        )
+        .toList();
+  }
+
+  void _applyRootMediaFields(Map<String, dynamic> requestBody) {
+    if (_mediaAttachments.isEmpty) return;
+    final first = _mediaAttachments.first;
+    requestBody['mediaUrl'] = first.url;
+    requestBody['mediaType'] = first.kind.apiValue;
+    requestBody['filename'] = first.filename;
+    if (first.kind == BulkMediaKind.image) {
+      requestBody['imageUrl'] = first.url;
+    }
   }
 
   Future<void> loadFromFile() async {
@@ -442,6 +418,14 @@ class MessageProvider extends ChangeNotifier {
       return;
     }
 
+    if (hasNonImageMedia) {
+      _addLog(
+        '[UYARI] Video/Belge gönderimi için Meta\'da uygun template header '
+        'gerekir. Şimdilik toplu gönderimde yalnızca RESİM destekleniyor.',
+      );
+      return;
+    }
+
     _status = SendingStatus.sending;
     _rateLimitedSessionId = null;
     _isResumingRateLimited = false;
@@ -479,14 +463,9 @@ class MessageProvider extends ChangeNotifier {
             'media': [],
           };
 
-          if (i == 0 && _selectedMediaUrls.isNotEmpty) {
-            for (var url in _selectedMediaUrls) {
-              (requestBody['media'] as List).add({
-                'url': url,
-                'type': 'image',
-                'fileName': url.split('/').last,
-              });
-            }
+          if (i == 0 && _mediaAttachments.isNotEmpty) {
+            (requestBody['media'] as List).addAll(_buildMediaPayload());
+            _applyRootMediaFields(requestBody);
           }
 
           final authHeaders = await _getAuthHeaders();
@@ -518,13 +497,8 @@ class MessageProvider extends ChangeNotifier {
           'maxDelay': maxDelay,
           'media': [],
         };
-        for (var url in _selectedMediaUrls) {
-          (requestBody['media'] as List).add({
-            'url': url,
-            'type': 'image',
-            'fileName': url.split('/').last,
-          });
-        }
+        (requestBody['media'] as List).addAll(_buildMediaPayload());
+        _applyRootMediaFields(requestBody);
         final authHeaders = await _getAuthHeaders();
         final response = await http.post(
           Uri.parse('$_baseUrl/start'),
@@ -679,14 +653,9 @@ class MessageProvider extends ChangeNotifier {
         'media': [],
       };
 
-      if (_selectedMediaUrls.isNotEmpty) {
-        for (var url in _selectedMediaUrls) {
-          (requestBody['media'] as List).add({
-            'url': url,
-            'type': 'image',
-            'fileName': url.split('/').last,
-          });
-        }
+      if (_mediaAttachments.isNotEmpty) {
+        (requestBody['media'] as List).addAll(_buildMediaPayload());
+        _applyRootMediaFields(requestBody);
       }
 
       final previousSent = _sentCount;
@@ -780,7 +749,7 @@ class MessageProvider extends ChangeNotifier {
     _rateLimitedSessionId = null;
     _isResumingRateLimited = false;
     _logs.clear();
-    _selectedMediaUrls.clear();
+    _mediaAttachments.clear();
     _base64MediaList.clear();
     _lastLoadedFileName = null;
     notifyListeners();

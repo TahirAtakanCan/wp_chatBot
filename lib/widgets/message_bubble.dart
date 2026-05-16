@@ -195,6 +195,7 @@ class MessageBubble extends StatelessWidget {
     final status = statusRaw.trim().toUpperCase();
     switch (status) {
       case 'PENDING':
+      case 'SENDING':
         return const Icon(
           Icons.access_time,
           size: 10,

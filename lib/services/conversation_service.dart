@@ -5,10 +5,13 @@ import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../utils/message_json_parser.dart';
 import 'api_exceptions.dart';
 import 'auth_service.dart';
 
 class ConversationService {
+  static const Duration _mediaReplyTimeout = Duration(minutes: 5);
+
   String get _baseUrl => AppConfig.baseHost;
 
   Future<Map<String, String>> _getHeaders() async {
@@ -122,18 +125,35 @@ class ConversationService {
     Map<String, dynamic> body, {
     required String fallbackError,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/conversations/$conversationId/$endpointSuffix'),
-      headers: await _getHeaders(),
-      body: utf8.encode(jsonEncode(body)),
-    );
+    final response = await http
+        .post(
+          Uri.parse(
+            '$_baseUrl/api/conversations/$conversationId/$endpointSuffix',
+          ),
+          headers: await _getHeaders(),
+          body: utf8.encode(jsonEncode(body)),
+        )
+        .timeout(_mediaReplyTimeout);
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      if (decoded is Map<String, dynamic>) {
-        return Message.fromJson(decoded);
+      if (response.bodyBytes.isEmpty) {
+        throw ApiException(
+          'Bos yanit alindi',
+          statusCode: response.statusCode,
+        );
       }
-      throw ApiException('Gecersiz yanit', statusCode: response.statusCode);
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return parseMessageResponse(
+        decoded,
+        defaultMessageType: _messageTypeForEndpoint(endpointSuffix),
+      );
+    }
+
+    if (response.statusCode == 202 || response.statusCode == 204) {
+      throw ApiException(
+        'Gonderim isleniyor, lutfen bekleyin',
+        statusCode: response.statusCode,
+      );
     }
 
     final errorBody = _decodeAsMap(response.body);
@@ -157,6 +177,19 @@ class ConversationService {
       errorBody['message']?.toString() ?? fallbackError,
       statusCode: response.statusCode,
     );
+  }
+
+  String? _messageTypeForEndpoint(String endpointSuffix) {
+    switch (endpointSuffix) {
+      case 'reply-image':
+        return 'IMAGE';
+      case 'reply-video':
+        return 'VIDEO';
+      case 'reply-document':
+        return 'DOCUMENT';
+      default:
+        return null;
+    }
   }
 
   Future<Message> sendReply(int conversationId, String text) async {

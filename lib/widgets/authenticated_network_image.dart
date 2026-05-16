@@ -57,14 +57,10 @@ class _AuthenticatedNetworkImageState extends State<AuthenticatedNetworkImage> {
     });
 
     try {
-      final headers = isPublicMediaUrl(widget.url)
-          ? <String, String>{}
-          : await _authHeaders();
-
-      final response = await http.get(Uri.parse(widget.url), headers: headers);
+      final response = await _fetchImage(allowRetry: true);
       if (!mounted) return;
 
-      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+      if (response != null && response.bodyBytes.isNotEmpty) {
         setState(() {
           _bytes = response.bodyBytes;
           _loading = false;
@@ -85,12 +81,32 @@ class _AuthenticatedNetworkImageState extends State<AuthenticatedNetworkImage> {
     }
   }
 
-  Future<Map<String, String>> _authHeaders() async {
+  Future<http.Response?> _fetchImage({required bool allowRetry}) async {
+    final headers = isPublicMediaUrl(widget.url)
+        ? <String, String>{}
+        : await _mediaAuthHeaders();
+
+    var response = await http.get(Uri.parse(widget.url), headers: headers);
+
+    if ((response.statusCode == 401 || response.statusCode == 403) &&
+        !isPublicMediaUrl(widget.url) &&
+        allowRetry) {
+      response = await http.get(
+        Uri.parse(widget.url),
+        headers: await _mediaAuthHeaders(),
+      );
+    }
+
+    if (response.statusCode == 200) return response;
+    return null;
+  }
+
+  Future<Map<String, String>> _mediaAuthHeaders() async {
     final token = await AuthService.getToken();
     if (token == null || token.isEmpty) {
       return {};
     }
-    return AppConfig.authHeaders(token);
+    return AppConfig.mediaAuthHeaders(token);
   }
 
   @override

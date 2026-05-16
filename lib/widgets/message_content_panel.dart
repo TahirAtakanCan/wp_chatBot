@@ -1,11 +1,20 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
+import '../models/bulk_media_attachment.dart';
 import '../models/template_model.dart';
 import '../providers/message_provider.dart';
+import '../services/chat_media_service.dart';
 import '../services/template_service.dart';
 import '../theme/wa_colors.dart';
+import '../utils/bulk_media_size_validator.dart';
+import '../utils/media_size_helper.dart';
+import '../utils/media_upload_with_progress.dart';
+import 'bulk_media_preview_chip.dart';
 import 'home_panel_card.dart';
+import 'media_type_picker_sheet.dart';
 
 class MessageContentPanel extends StatefulWidget {
   const MessageContentPanel({super.key});
@@ -75,6 +84,125 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
     }
     _messageFocusNode.requestFocus();
     setState(() {});
+  }
+
+  Future<void> _pickAndUploadMedia(BuildContext context) async {
+    final kind = await MediaTypePickerSheet.show(context);
+    if (kind == null || !context.mounted) return;
+
+    if (kind != BulkMediaKind.image) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.info_outline_rounded, color: WAColors.accent),
+          title: const Text('Template uyumluluğu'),
+          content: const Text(
+            'Şu an aktif template (ör. kurban_kardeslik_cagri_v2) yalnızca '
+            'RESİM header ile çalışıyor. Video/Belge göndermek için Meta\'da '
+            'yeni bir template oluşturulması gerekir.\n\n'
+            'Dosyayı yükleyebilirsiniz; gönderim şimdilik yalnızca resim '
+            'için yapılabilir.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Anladım'),
+            ),
+          ],
+        ),
+      );
+      if (!context.mounted) return;
+    }
+
+    final result = await _pickFileForKind(kind);
+    if (result == null || result.files.isEmpty || !context.mounted) return;
+
+    final file = result.files.first;
+    if (file.bytes == null) {
+      _showSnack(context, 'Dosya verisine erişilemedi.', isError: true);
+      return;
+    }
+
+    final sizeBytes = resolvePickerFileSize(
+      pickerSize: file.size,
+      bytes: file.bytes,
+    );
+    final sizeError = validateBulkMediaSize(sizeBytes, kind);
+    if (sizeError != null) {
+      _showSnack(context, sizeError, isError: true);
+      return;
+    }
+
+    final dialogTitle = switch (kind) {
+      BulkMediaKind.image => 'Resim Yükleniyor',
+      BulkMediaKind.video => 'Video Yükleniyor',
+      BulkMediaKind.document => 'Belge Yükleniyor',
+    };
+
+    try {
+      final upload = await uploadMediaWithProgressDialog(
+        context: context,
+        file: file,
+        dialogTitle: dialogTitle,
+      );
+      if (!context.mounted || upload == null) return;
+
+      context.read<MessageProvider>().addMediaAttachment(
+            BulkMediaAttachment(
+              url: upload.url,
+              kind: kind,
+              filename: upload.filename,
+              sizeBytes: upload.sizeBytes,
+            ),
+          );
+
+      if (kind != BulkMediaKind.image) {
+        _showSnack(
+          context,
+          'Yüklendi. Gönderim için Meta template güncellemesi gerekir.',
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      _showSnack(context, 'Yükleme başarısız: $e', isError: true);
+    }
+  }
+
+  Future<FilePickerResult?> _pickFileForKind(BulkMediaKind kind) {
+    switch (kind) {
+      case BulkMediaKind.image:
+        return FilePicker.platform.pickFiles(
+          type: FileType.image,
+          allowMultiple: false,
+          withData: true,
+        );
+      case BulkMediaKind.video:
+        return FilePicker.platform.pickFiles(
+          type: FileType.video,
+          allowMultiple: false,
+          withData: true,
+        );
+      case BulkMediaKind.document:
+        return FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ChatMediaService.documentExtensions,
+          allowMultiple: false,
+          withData: true,
+        );
+    }
+  }
+
+  void _showSnack(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : null,
+      ),
+    );
   }
 
   void _showTemplateBottomSheet(BuildContext context) {
@@ -248,6 +376,43 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
             ),
             const SizedBox(height: 10),
 
+            if (provider.hasNonImageMedia)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: WAColors.warningBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: WAColors.warningYellow.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: WAColors.warningYellow,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Video/Belge yüklendi ancak mevcut template yalnızca '
+                        'RESİM header destekliyor. Gönderim şimdilik resim '
+                        'için kullanılabilir.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: WAColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // ── Mesaj Yazma Alanı ──
             Expanded(
               child: TextField(
@@ -326,7 +491,7 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                     child: _ToolbarButton(
                       icon: Icons.upload_file_rounded,
                       label: 'Bilgisayardan Yükle',
-                      onTap: () => provider.uploadMediaFromDevice(),
+                      onTap: () => _pickAndUploadMedia(context),
                       theme: theme,
                       badge: provider.hasMedia ? provider.mediaCount : null,
                     ),
@@ -345,68 +510,16 @@ class _MessageContentPanelState extends State<MessageContentPanel> {
                         height: 28,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
-                          itemCount:
-                              provider.attachedMedia.length,
+                          itemCount: provider.mediaAttachments.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(width: 4),
                           itemBuilder: (context, index) {
-                            final url =
-                                provider.attachedMedia[index];
-                            final fileName =
-                                Uri.decodeComponent(
-                                    url.split('/').last);
-                            final shortName =
-                                fileName.length > 18
-                                    ? '${fileName.substring(0, 15)}...'
-                                    : fileName;
-                            return Container(
-                              padding:
-                                  const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4),
-                              decoration: BoxDecoration(
-                                color: theme
-                                    .colorScheme.primaryContainer
-                                    .withValues(alpha: 0.4),
-                                borderRadius:
-                                    BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: theme
-                                      .colorScheme.primary
-                                      .withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.image_outlined,
-                                      size: 13,
-                                      color: theme
-                                          .colorScheme.primary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    shortName,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: theme.colorScheme
-                                          .onPrimaryContainer,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  InkWell(
-                                    borderRadius:
-                                        BorderRadius.circular(10),
-                                    onTap: () =>
-                                        provider.removeMedia(index),
-                                    child: Icon(
-                                        Icons.close_rounded,
-                                        size: 13,
-                                        color: theme
-                                            .colorScheme.error),
-                                  ),
-                                ],
-                              ),
+                            final attachment =
+                                provider.mediaAttachments[index];
+                            return BulkMediaPreviewChip(
+                              attachment: attachment,
+                              theme: theme,
+                              onRemove: () => provider.removeMedia(index),
                             );
                           },
                         ),

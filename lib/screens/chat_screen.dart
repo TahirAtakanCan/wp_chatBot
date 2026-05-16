@@ -1,15 +1,17 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/conversation.dart';
 import '../models/message.dart';
-import '../models/media_upload_result.dart' show VideoSendMode;
+import '../models/media_upload_result.dart';
 import '../services/api_exceptions.dart';
 import '../services/api_service.dart';
 import '../services/chat_media_service.dart';
 import '../utils/media_size_helper.dart';
+import '../utils/message_media_url.dart';
 import '../theme/wa_colors.dart';
 import '../theme/wa_text_styles.dart';
 import '../widgets/chat_composer.dart';
@@ -17,6 +19,7 @@ import '../widgets/chat_header_bar.dart';
 import '../widgets/date_separator.dart';
 import '../widgets/chat_wallpaper.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/upload_progress_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
@@ -131,6 +134,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final merged = <Message>[...current];
 
     for (final item in incoming) {
+      if (item.isOutbound && item.hasWaMessageId && item.isDeliveredStatus) {
+        _pruneOptimisticForDelivered(merged, item);
+      }
+
       final index = _findMessageIndexByUniqueKey(merged, item);
       if (index >= 0) {
         merged[index] = item;
@@ -139,8 +146,63 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
+    _pruneStaleOptimisticMessages(merged);
     merged.sort((a, b) => a.sentAt.compareTo(b.sentAt));
     return merged;
+  }
+
+  void _pruneOptimisticForDelivered(List<Message> messages, Message delivered) {
+    messages.removeWhere((candidate) {
+      if (candidate.id >= 0) return false;
+      if (!candidate.isOutbound) return false;
+      if (candidate.messageType.toUpperCase() !=
+          delivered.messageType.toUpperCase()) {
+        return false;
+      }
+
+      final timeDiff = delivered.sentAt.difference(candidate.sentAt).abs();
+      if (timeDiff > const Duration(minutes: 10)) return false;
+
+      final candidateUrl = candidate.mediaUrl ?? candidate.url;
+      final deliveredUrl = delivered.mediaUrl ?? delivered.url;
+      if (candidateUrl != null &&
+          deliveredUrl != null &&
+          (candidateUrl == deliveredUrl ||
+              _urlsLikelySame(candidateUrl, deliveredUrl))) {
+        return true;
+      }
+
+      return candidate.status.toUpperCase() == 'FAILED' ||
+          candidate.status.toUpperCase() == 'PENDING';
+    });
+  }
+
+  void _pruneStaleOptimisticMessages(List<Message> messages) {
+    messages.removeWhere((candidate) {
+      if (candidate.id >= 0) return false;
+
+      final candidateUrl = candidate.mediaUrl ?? candidate.url;
+      if (candidateUrl == null || candidateUrl.isEmpty) return false;
+
+      final candidateType = candidate.messageType.toUpperCase();
+      return messages.any((other) {
+        if (other.id <= 0 || other.id == candidate.id) return false;
+        if (!other.isOutbound) return false;
+        if (other.messageType.toUpperCase() != candidateType) return false;
+        if (other.status.toUpperCase() == 'FAILED') return false;
+
+        final otherUrl = other.mediaUrl ?? other.url;
+        if (otherUrl == null || otherUrl.isEmpty) return false;
+
+        return otherUrl == candidateUrl ||
+            _urlsLikelySame(otherUrl, candidateUrl);
+      });
+    });
+  }
+
+  bool _urlsLikelySame(String a, String b) {
+    if (a == b) return true;
+    return a.endsWith(b) || b.endsWith(a);
   }
 
   int _findMessageIndexByUniqueKey(List<Message> list, Message message) {
@@ -238,16 +300,18 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (!mounted) return;
 
+      final resolved = _resolveSentMediaMessage(sent, fallback: tempMessage);
       setState(() {
         final idx = _messages.indexWhere((m) => m.id == tempMessage.id);
         if (idx >= 0) {
-          _messages[idx] = sent;
+          _messages[idx] = resolved;
         } else {
-          _messages = <Message>[..._messages, sent];
+          _messages = <Message>[..._messages, resolved];
         }
         _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       });
       _scrollToBottom();
+      _showSnackBar('Resim gönderildi', isSuccess: true);
     } on ReplyWindowClosedException {
       _markMessageFailed(tempMessage.id);
       _showSnackBar('Pencere kapali, sayfayi yenileyin');
@@ -255,8 +319,17 @@ class _ChatScreenState extends State<ChatScreen> {
       _markMessageFailed(tempMessage.id);
       _showSnackBar('Hiz limiti, biraz sonra deneyin');
     } catch (e) {
-      _markMessageFailed(tempMessage.id);
-      _showSnackBar('Gonderilemedi: $e');
+      final reconciled = await _tryReconcileMediaSend(
+        tempMessageId: tempMessage.id,
+        mediaUrl: imageUrl,
+        messageType: 'IMAGE',
+      );
+      if (!reconciled) {
+        _markMessageFailed(tempMessage.id);
+        _showSnackBar(_formatSendError(e), isError: true);
+      } else {
+        _showSnackBar('Resim gönderildi', isSuccess: true);
+      }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -272,10 +345,16 @@ class _ChatScreenState extends State<ChatScreen> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.video,
       allowMultiple: false,
+      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
 
     final file = result.files.first;
+    if (file.bytes == null) {
+      _showSnackBar('Dosya verisine erişilemedi', isError: true);
+      return;
+    }
+
     try {
       final sizeBytes = resolvePickerFileSize(
         pickerSize: file.size,
@@ -293,8 +372,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final caption = _takeCaption();
     setState(() => _isSending = true);
     try {
-      final upload = await _chatMediaService.uploadMedia(file);
+      final upload = await _uploadFileWithProgressDialog(
+        file: file,
+        dialogTitle: 'Video Yükleniyor',
+      );
       if (!mounted) return;
+      if (upload == null) {
+        setState(() => _isSending = false);
+        return;
+      }
 
       final mode = decideVideoSendMode(upload.sizeBytes);
       if (mode == VideoSendMode.inlineVideo) {
@@ -306,9 +392,9 @@ class _ChatScreenState extends State<ChatScreen> {
           caption: caption,
         );
       }
-      if (mounted) _showSnackBar('Video gönderildi');
     } on VideoTooLargeException catch (e) {
       if (mounted) {
+        setState(() => _isSending = false);
         _showSnackBar(e.message, isError: true, durationSeconds: 5);
       }
     } catch (e) {
@@ -328,10 +414,16 @@ class _ChatScreenState extends State<ChatScreen> {
       type: FileType.custom,
       allowedExtensions: ChatMediaService.documentExtensions,
       allowMultiple: false,
+      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
 
     final file = result.files.first;
+    if (file.bytes == null) {
+      _showSnackBar('Dosya verisine erişilemedi', isError: true);
+      return;
+    }
+
     try {
       final sizeBytes = resolvePickerFileSize(
         pickerSize: file.size,
@@ -350,14 +442,79 @@ class _ChatScreenState extends State<ChatScreen> {
     final caption = _takeCaption();
     setState(() => _isSending = true);
     try {
-      final upload = await _chatMediaService.uploadMedia(file);
+      final upload = await _uploadFileWithProgressDialog(
+        file: file,
+        dialogTitle: 'Belge Yükleniyor',
+      );
       if (!mounted) return;
+      if (upload == null) {
+        setState(() => _isSending = false);
+        return;
+      }
+
       await _sendDocument(upload.url, upload.filename, caption: caption);
-      if (mounted) _showSnackBar('Belge gönderildi');
     } catch (e) {
       if (mounted) {
         setState(() => _isSending = false);
         _showSnackBar('Belge gönderilemedi: $e', isError: true);
+      }
+    }
+  }
+
+  Future<MediaUploadResult?> _uploadFileWithProgressDialog({
+    required PlatformFile file,
+    required String dialogTitle,
+  }) async {
+    final sizeBytes = resolvePickerFileSize(
+      pickerSize: file.size,
+      bytes: file.bytes,
+    );
+    final dialogKey = GlobalKey<UploadProgressDialogState>();
+    final cancelToken = CancelToken();
+    var progressDialogOpen = false;
+
+    if (!mounted) return null;
+
+    progressDialogOpen = true;
+    // ignore: unawaited_futures
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: UploadProgressDialog(
+          key: dialogKey,
+          title: dialogTitle,
+          filename: file.name,
+          sizeFormatted: formatFileSizeDisplay(sizeBytes),
+          totalBytes: sizeBytes,
+          onCancel: () {
+            cancelToken.cancel('Kullanıcı iptal etti');
+            Navigator.of(dialogContext).pop();
+          },
+        ),
+      ),
+    ).whenComplete(() => progressDialogOpen = false);
+
+    try {
+      return await _chatMediaService.uploadMedia(
+        file,
+        onProgress: (sent, total) {
+          dialogKey.currentState?.updateProgress(sent, total);
+        },
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        if (mounted) {
+          _showSnackBar('Yükleme iptal edildi');
+        }
+        return null;
+      }
+      rethrow;
+    } finally {
+      if (progressDialogOpen && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
       }
     }
   }
@@ -412,16 +569,18 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (!mounted) return;
 
+      final resolved = _resolveSentMediaMessage(sent, fallback: tempMessage);
       setState(() {
         final idx = _messages.indexWhere((m) => m.id == tempMessage.id);
         if (idx >= 0) {
-          _messages[idx] = sent;
+          _messages[idx] = resolved;
         } else {
-          _messages = <Message>[..._messages, sent];
+          _messages = <Message>[..._messages, resolved];
         }
         _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       });
       _scrollToBottom();
+      _showSnackBar('Video gönderildi', isSuccess: true);
     } on ReplyWindowClosedException {
       _markMessageFailed(tempMessage.id);
       _showSnackBar('Pencere kapali, sayfayi yenileyin');
@@ -429,8 +588,17 @@ class _ChatScreenState extends State<ChatScreen> {
       _markMessageFailed(tempMessage.id);
       _showSnackBar('Hiz limiti, biraz sonra deneyin');
     } catch (e) {
-      _markMessageFailed(tempMessage.id);
-      _showSnackBar('Gonderilemedi: $e');
+      final reconciled = await _tryReconcileMediaSend(
+        tempMessageId: tempMessage.id,
+        mediaUrl: mediaUrl,
+        messageType: 'VIDEO',
+      );
+      if (!reconciled) {
+        _markMessageFailed(tempMessage.id);
+        _showSnackBar(_formatSendError(e), isError: true);
+      } else {
+        _showSnackBar('Video gönderildi', isSuccess: true);
+      }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -484,16 +652,18 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (!mounted) return;
 
+      final resolved = _resolveSentMediaMessage(sent, fallback: tempMessage);
       setState(() {
         final idx = _messages.indexWhere((m) => m.id == tempMessage.id);
         if (idx >= 0) {
-          _messages[idx] = sent;
+          _messages[idx] = resolved;
         } else {
-          _messages = <Message>[..._messages, sent];
+          _messages = <Message>[..._messages, resolved];
         }
         _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       });
       _scrollToBottom();
+      _showSnackBar('Belge gönderildi', isSuccess: true);
     } on ReplyWindowClosedException {
       _markMessageFailed(tempMessage.id);
       _showSnackBar('Pencere kapali, sayfayi yenileyin');
@@ -501,13 +671,135 @@ class _ChatScreenState extends State<ChatScreen> {
       _markMessageFailed(tempMessage.id);
       _showSnackBar('Hiz limiti, biraz sonra deneyin');
     } catch (e) {
-      _markMessageFailed(tempMessage.id);
-      _showSnackBar('Gonderilemedi: $e');
+      final reconciled = await _tryReconcileMediaSend(
+        tempMessageId: tempMessage.id,
+        mediaUrl: mediaUrl,
+        messageType: 'DOCUMENT',
+      );
+      if (!reconciled) {
+        _markMessageFailed(tempMessage.id);
+        _showSnackBar(_formatSendError(e), isError: true);
+      } else {
+        _showSnackBar('Belge gönderildi', isSuccess: true);
+      }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
       }
     }
+  }
+
+  Message _resolveSentMediaMessage(Message sent, {required Message fallback}) {
+    var status = sent.status.toUpperCase();
+    if (sent.hasWaMessageId &&
+        (status.isEmpty || status == 'FAILED' || status == 'PENDING')) {
+      status = 'SENT';
+    } else if (status.isEmpty) {
+      status = 'SENT';
+    }
+
+    final displayUrls = _pickDisplayMediaUrls(sent, fallback);
+
+    return Message(
+      id: sent.id > 0 ? sent.id : fallback.id,
+      direction:
+          sent.direction.isNotEmpty ? sent.direction : fallback.direction,
+      messageType: sent.messageType.isNotEmpty
+          ? sent.messageType
+          : fallback.messageType,
+      content: sent.content ?? fallback.content,
+      waMessageId: sent.waMessageId ?? fallback.waMessageId,
+      mediaId: sent.mediaId ?? fallback.mediaId,
+      mediaUrl: displayUrls.mediaUrl,
+      url: displayUrls.url,
+      mimeType: sent.mimeType ?? fallback.mimeType,
+      caption: sent.caption ?? fallback.caption,
+      filename: sent.filename ?? fallback.filename,
+      fileSizeBytes: sent.fileSizeBytes ?? fallback.fileSizeBytes,
+      sentAt: sent.sentAt,
+      status: status,
+    );
+  }
+
+  ({String? mediaUrl, String? url}) _pickDisplayMediaUrls(
+    Message sent,
+    Message fallback,
+  ) {
+    final sentMedia = sent.mediaUrl ?? sent.url;
+    final sentUrl = sent.url ?? sent.mediaUrl;
+    final fallbackMedia = fallback.mediaUrl ?? fallback.url;
+    final fallbackUrl = fallback.url ?? fallback.mediaUrl;
+
+    if (fallbackMedia != null && isPublicMediaUrl(fallbackMedia)) {
+      return (mediaUrl: fallbackMedia, url: fallbackUrl ?? fallbackMedia);
+    }
+
+    return (
+      mediaUrl: sentMedia ?? fallbackMedia,
+      url: sentUrl ?? fallbackUrl,
+    );
+  }
+
+  String _formatSendError(Object error) {
+    if (error is ApiException && error.statusCode != null) {
+      return 'Gönderilemedi (${error.statusCode}): ${error.message}';
+    }
+    return 'Gönderilemedi: $error';
+  }
+
+  Future<bool> _tryReconcileMediaSend({
+    required int tempMessageId,
+    required String mediaUrl,
+    required String messageType,
+  }) async {
+    if (_conversation == null) return false;
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(seconds: 2 * attempt));
+      }
+      try {
+        final incoming = await _apiService.fetchMessages(_conversation!.id);
+        final cutoff = DateTime.now().subtract(const Duration(minutes: 10));
+        final matches = incoming.where((m) {
+          if (!m.isOutbound) return false;
+          if (m.messageType.toUpperCase() != messageType) return false;
+          if (m.sentAt.isBefore(cutoff)) return false;
+          if (!m.hasWaMessageId && !m.isDeliveredStatus) return false;
+          if (m.status.toUpperCase() == 'FAILED') return false;
+
+          final url = m.mediaUrl ?? m.url;
+          if (url != null &&
+              url.isNotEmpty &&
+              (url == mediaUrl || _urlsLikelySame(url, mediaUrl))) {
+            return true;
+          }
+
+          return m.hasWaMessageId && m.isDeliveredStatus;
+        }).toList();
+
+        if (matches.isEmpty) continue;
+
+        matches.sort((a, b) => b.sentAt.compareTo(a.sentAt));
+        if (!mounted) return false;
+
+        setState(() {
+          _messages.removeWhere((m) => m.id == tempMessageId);
+          final serverMsg = matches.first;
+          final idx = _findMessageIndexByUniqueKey(_messages, serverMsg);
+          if (idx >= 0) {
+            _messages[idx] = serverMsg;
+          } else {
+            _messages.add(serverMsg);
+          }
+          _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+        });
+        return true;
+      } catch (_) {
+        // Sonraki denemede tekrar dene.
+      }
+    }
+    return false;
   }
 
   Future<void> _sendText(String text, {int? replaceMessageId}) async {
@@ -665,6 +957,13 @@ class _ChatScreenState extends State<ChatScreen> {
           messageType: failed.messageType,
           content: failed.content,
           waMessageId: failed.waMessageId,
+          mediaId: failed.mediaId,
+          mediaUrl: failed.mediaUrl,
+          url: failed.url,
+          mimeType: failed.mimeType,
+          caption: failed.caption,
+          filename: failed.filename,
+          fileSizeBytes: failed.fileSizeBytes,
           sentAt: failed.sentAt,
           status: 'FAILED',
         );
@@ -754,6 +1053,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showSnackBar(
     String message, {
     bool isError = false,
+    bool isSuccess = false,
     int durationSeconds = 3,
   }) {
     if (!mounted) return;
@@ -762,7 +1062,9 @@ class _ChatScreenState extends State<ChatScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: isError ? Colors.red.shade700 : null,
+          backgroundColor: isError
+              ? Colors.red.shade700
+              : (isSuccess ? WAColors.accentDark : null),
           duration: Duration(seconds: durationSeconds),
         ),
       );

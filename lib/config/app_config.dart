@@ -26,4 +26,10 @@ class AppConfig {
         'Accept': 'application/json; charset=utf-8',
         'Authorization': 'Bearer $token',
       };
+
+  /// Medya dosyasi indirme (binary) — JSON Accept kullanma, 403 riski.
+  static Map<String, String> mediaAuthHeaders(String token) => {
+        'Authorization': 'Bearer $token',
+        'Accept': '*/*',
+      };
 }

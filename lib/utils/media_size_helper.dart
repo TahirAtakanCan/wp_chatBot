@@ -6,6 +6,14 @@ String formatFileSizeMb(int sizeBytes) {
   return (sizeBytes / (1024 * 1024)).toStringAsFixed(1);
 }
 
+String formatFileSizeDisplay(int sizeBytes) {
+  if (sizeBytes < 1024) return '$sizeBytes B';
+  if (sizeBytes < 1024 * 1024) {
+    return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+  }
+  return '${formatFileSizeMb(sizeBytes)} MB';
+}
+
 void ensureWithinWhatsAppLimit(int sizeBytes, {required bool isVideo}) {
   if (sizeBytes <= MediaSizeLimits.whatsappMaxBytes) return;
 

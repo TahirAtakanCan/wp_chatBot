@@ -38,6 +38,53 @@ class Message {
 
   bool get isImage => messageType.toUpperCase() == 'IMAGE';
 
+  bool get hasWaMessageId => (waMessageId ?? '').trim().isNotEmpty;
+
+  bool get isDeliveredStatus {
+    switch (status.toUpperCase()) {
+      case 'SENT':
+      case 'DELIVERED':
+      case 'READ':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  Message copyWith({
+    int? id,
+    String? direction,
+    String? messageType,
+    String? content,
+    String? waMessageId,
+    String? mediaId,
+    String? mediaUrl,
+    String? url,
+    String? mimeType,
+    String? caption,
+    String? filename,
+    int? fileSizeBytes,
+    DateTime? sentAt,
+    String? status,
+  }) {
+    return Message(
+      id: id ?? this.id,
+      direction: direction ?? this.direction,
+      messageType: messageType ?? this.messageType,
+      content: content ?? this.content,
+      waMessageId: waMessageId ?? this.waMessageId,
+      mediaId: mediaId ?? this.mediaId,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
+      url: url ?? this.url,
+      mimeType: mimeType ?? this.mimeType,
+      caption: caption ?? this.caption,
+      filename: filename ?? this.filename,
+      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
+      sentAt: sentAt ?? this.sentAt,
+      status: status ?? this.status,
+    );
+  }
+
   String? get effectiveCaption {
     final cap = caption?.trim();
     if (cap != null && cap.isNotEmpty) return cap;
