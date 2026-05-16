@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -111,12 +112,25 @@ class ConversationService {
   }
 
   Future<Message> sendReply(int conversationId, String text) async {
-    final payload = utf8.encode(jsonEncode({'text': text}));
+    // === DEBUG START ===
+    debugPrint('[SERVICE DEBUG] text=[$text] length=${text.length}');
+    final encoded = jsonEncode({'text': text});
+    debugPrint('[SERVICE DEBUG] jsonEncoded=[$encoded]');
+    final bodyBytes = utf8.encode(encoded);
+    debugPrint('[SERVICE DEBUG] body bytes count=${bodyBytes.length}');
+    debugPrint('[SERVICE DEBUG] body bytes=${bodyBytes.take(50).toList()}');
+    // === DEBUG END ===
+    final payload = bodyBytes;
     final response = await http.post(
       Uri.parse('$_baseUrl/api/conversations/$conversationId/reply'),
       headers: await _getHeaders(),
       body: payload,
     );
+
+    // === DEBUG START ===
+    debugPrint('[SERVICE DEBUG] response status=${response.statusCode}');
+    debugPrint('[SERVICE DEBUG] response body=${response.body}');
+    // === DEBUG END ===
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
