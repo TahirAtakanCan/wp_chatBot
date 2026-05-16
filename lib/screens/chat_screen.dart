@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../models/media_upload_result.dart' show VideoSendMode;
 import '../services/api_exceptions.dart';
 import '../services/api_service.dart';
 import '../services/chat_media_service.dart';
+import '../utils/media_size_helper.dart';
 import '../theme/wa_colors.dart';
 import '../theme/wa_text_styles.dart';
 import '../widgets/chat_composer.dart';
@@ -180,12 +182,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() => _isSending = true);
     try {
-      final publicUrl = await _chatMediaService.uploadPublicImage(
+      final upload = await _chatMediaService.uploadPublicImage(
         bytes: file.bytes!,
         filename: file.name,
       );
       if (!mounted) return;
-      await _sendImage(publicUrl, caption: caption.isEmpty ? null : caption);
+      await _sendImage(upload.url, caption: caption.isEmpty ? null : caption);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSending = false);
@@ -232,6 +234,252 @@ class _ChatScreenState extends State<ChatScreen> {
       final sent = await _apiService.sendReplyImage(
         _conversation!.id,
         imageUrl: imageUrl,
+        caption: caption,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == tempMessage.id);
+        if (idx >= 0) {
+          _messages[idx] = sent;
+        } else {
+          _messages = <Message>[..._messages, sent];
+        }
+        _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      });
+      _scrollToBottom();
+    } on ReplyWindowClosedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Pencere kapali, sayfayi yenileyin');
+    } on RateLimitedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Hiz limiti, biraz sonra deneyin');
+    } catch (e) {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Gonderilemedi: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  Future<void> _pickAndSendVideo() async {
+    if (_isSending || _conversation == null || !_conversation!.replyWindowOpen) {
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.video,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    try {
+      final sizeBytes = resolvePickerFileSize(
+        pickerSize: file.size,
+        bytes: file.bytes,
+      );
+      ensureWithinWhatsAppLimit(sizeBytes, isVideo: true);
+    } on VideoTooLargeException catch (e) {
+      _showSnackBar(e.message, isError: true, durationSeconds: 5);
+      return;
+    } catch (e) {
+      _showSnackBar('Dosya boyutu okunamadı: $e', isError: true);
+      return;
+    }
+
+    final caption = _takeCaption();
+    setState(() => _isSending = true);
+    try {
+      final upload = await _chatMediaService.uploadMedia(file);
+      if (!mounted) return;
+
+      final mode = decideVideoSendMode(upload.sizeBytes);
+      if (mode == VideoSendMode.inlineVideo) {
+        await _sendVideo(upload.url, caption: caption);
+      } else {
+        await _sendDocument(
+          upload.url,
+          upload.filename,
+          caption: caption,
+        );
+      }
+      if (mounted) _showSnackBar('Video gönderildi');
+    } on VideoTooLargeException catch (e) {
+      if (mounted) {
+        _showSnackBar(e.message, isError: true, durationSeconds: 5);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        _showSnackBar('Video gönderilemedi: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _pickAndSendDocument() async {
+    if (_isSending || _conversation == null || !_conversation!.replyWindowOpen) {
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ChatMediaService.documentExtensions,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    try {
+      final sizeBytes = resolvePickerFileSize(
+        pickerSize: file.size,
+        bytes: file.bytes,
+      );
+      ensureWithinWhatsAppLimit(sizeBytes, isVideo: false);
+    } catch (e) {
+      _showSnackBar(
+        e is VideoTooLargeException ? e.message : 'Dosya boyutu okunamadı: $e',
+        isError: true,
+        durationSeconds: e is VideoTooLargeException ? 5 : 3,
+      );
+      return;
+    }
+
+    final caption = _takeCaption();
+    setState(() => _isSending = true);
+    try {
+      final upload = await _chatMediaService.uploadMedia(file);
+      if (!mounted) return;
+      await _sendDocument(upload.url, upload.filename, caption: caption);
+      if (mounted) _showSnackBar('Belge gönderildi');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        _showSnackBar('Belge gönderilemedi: $e', isError: true);
+      }
+    }
+  }
+
+  String? _takeCaption() {
+    final caption = _replyController.text.trim();
+    if (caption.isEmpty) return null;
+    _replyController.clear();
+    return caption;
+  }
+
+  Future<void> _sendVideo(
+    String mediaUrl, {
+    String? caption,
+    int? replaceMessageId,
+  }) async {
+    if (_conversation == null) return;
+
+    final tempMessage = Message(
+      id: replaceMessageId ?? -DateTime.now().microsecondsSinceEpoch,
+      direction: 'OUTBOUND',
+      messageType: 'VIDEO',
+      content: caption,
+      caption: caption,
+      mediaUrl: mediaUrl,
+      url: mediaUrl,
+      waMessageId: null,
+      sentAt: DateTime.now(),
+      status: 'PENDING',
+    );
+
+    setState(() {
+      _isSending = true;
+      if (replaceMessageId != null) {
+        final idx = _messages.indexWhere((m) => m.id == replaceMessageId);
+        if (idx >= 0) {
+          _messages[idx] = tempMessage;
+        }
+      } else {
+        _messages = <Message>[..._messages, tempMessage];
+      }
+      _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    });
+
+    _scrollToBottom();
+
+    try {
+      final sent = await _apiService.sendReplyVideo(
+        _conversation!.id,
+        mediaUrl: mediaUrl,
+        caption: caption,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == tempMessage.id);
+        if (idx >= 0) {
+          _messages[idx] = sent;
+        } else {
+          _messages = <Message>[..._messages, sent];
+        }
+        _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      });
+      _scrollToBottom();
+    } on ReplyWindowClosedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Pencere kapali, sayfayi yenileyin');
+    } on RateLimitedException {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Hiz limiti, biraz sonra deneyin');
+    } catch (e) {
+      _markMessageFailed(tempMessage.id);
+      _showSnackBar('Gonderilemedi: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  Future<void> _sendDocument(
+    String mediaUrl,
+    String filename, {
+    String? caption,
+    int? replaceMessageId,
+  }) async {
+    if (_conversation == null) return;
+
+    final tempMessage = Message(
+      id: replaceMessageId ?? -DateTime.now().microsecondsSinceEpoch,
+      direction: 'OUTBOUND',
+      messageType: 'DOCUMENT',
+      content: filename,
+      caption: caption,
+      filename: filename,
+      mediaUrl: mediaUrl,
+      url: mediaUrl,
+      waMessageId: null,
+      sentAt: DateTime.now(),
+      status: 'PENDING',
+    );
+
+    setState(() {
+      _isSending = true;
+      if (replaceMessageId != null) {
+        final idx = _messages.indexWhere((m) => m.id == replaceMessageId);
+        if (idx >= 0) {
+          _messages[idx] = tempMessage;
+        }
+      } else {
+        _messages = <Message>[..._messages, tempMessage];
+      }
+      _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    });
+
+    _scrollToBottom();
+
+    try {
+      final sent = await _apiService.sendReplyDocument(
+        _conversation!.id,
+        mediaUrl: mediaUrl,
+        filename: filename,
         caption: caption,
       );
       if (!mounted) return;
@@ -503,11 +751,21 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(
+    String message, {
+    bool isError = false,
+    int durationSeconds = 3,
+  }) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? Colors.red.shade700 : null,
+          duration: Duration(seconds: durationSeconds),
+        ),
+      );
   }
 
   @override
@@ -532,7 +790,9 @@ class _ChatScreenState extends State<ChatScreen> {
               focusNode: _replyFocusNode,
               isSending: _isSending,
               onSend: _sendReply,
-              onAttachImage: _pickAndSendImage,
+              onPickImage: _pickAndSendImage,
+              onPickVideo: _pickAndSendVideo,
+              onPickDocument: _pickAndSendDocument,
               onTemplatePressed: () {
                 _showSnackBar('Yakında: template gönderimi');
               },
@@ -570,7 +830,9 @@ class _ChatScreenState extends State<ChatScreen> {
               focusNode: _replyFocusNode,
               isSending: _isSending,
               onSend: _sendReply,
-              onAttachImage: _pickAndSendImage,
+              onPickImage: _pickAndSendImage,
+              onPickVideo: _pickAndSendVideo,
+              onPickDocument: _pickAndSendDocument,
               onTemplatePressed: () {
                 _showSnackBar('Yakında: template gönderimi');
               },

@@ -16,3 +16,12 @@ class ReplyWindowClosedException extends ApiException {
 class RateLimitedException extends ApiException {
   RateLimitedException(super.message, {super.statusCode});
 }
+
+class VideoTooLargeException implements Exception {
+  final String message;
+
+  VideoTooLargeException(this.message);
+
+  @override
+  String toString() => message;
+}

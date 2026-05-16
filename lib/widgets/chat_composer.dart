@@ -9,7 +9,9 @@ class ChatComposer extends StatefulWidget {
   final FocusNode focusNode;
   final bool isSending;
   final Future<void> Function() onSend;
-  final Future<void> Function()? onAttachImage;
+  final Future<void> Function()? onPickImage;
+  final Future<void> Function()? onPickVideo;
+  final Future<void> Function()? onPickDocument;
   final VoidCallback onTemplatePressed;
 
   const ChatComposer({
@@ -19,7 +21,9 @@ class ChatComposer extends StatefulWidget {
     required this.focusNode,
     required this.isSending,
     required this.onSend,
-    this.onAttachImage,
+    this.onPickImage,
+    this.onPickVideo,
+    this.onPickDocument,
     required this.onTemplatePressed,
   });
 
@@ -70,6 +74,54 @@ class _ChatComposerState extends State<ChatComposer>
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  bool get _hasAttachmentActions =>
+      widget.onPickImage != null ||
+      widget.onPickVideo != null ||
+      widget.onPickDocument != null;
+
+  void _openAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.onPickImage != null)
+                ListTile(
+                  leading: const Icon(Icons.image_outlined),
+                  title: const Text('Resim'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    widget.onPickImage!();
+                  },
+                ),
+              if (widget.onPickVideo != null)
+                ListTile(
+                  leading: const Icon(Icons.videocam_outlined),
+                  title: const Text('Video'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    widget.onPickVideo!();
+                  },
+                ),
+              if (widget.onPickDocument != null)
+                ListTile(
+                  leading: const Icon(Icons.insert_drive_file_outlined),
+                  title: const Text('Belge'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    widget.onPickDocument!();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEnabled = widget.enabled && !widget.isSending;
@@ -110,9 +162,9 @@ class _ChatComposerState extends State<ChatComposer>
                     onPressed: isEnabled ? () => _showSnack('Yakında: emoji') : null,
                   ),
                   _buildIconAction(
-                    icon: Icons.image_outlined,
-                    onPressed: isEnabled && widget.onAttachImage != null
-                        ? () => widget.onAttachImage!()
+                    icon: Icons.attach_file_rounded,
+                    onPressed: isEnabled && _hasAttachmentActions
+                        ? _openAttachmentMenu
                         : null,
                   ),
                   Expanded(

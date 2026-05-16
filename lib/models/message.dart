@@ -11,6 +11,8 @@ class Message {
   final String? url;
   final String? mimeType;
   final String? caption;
+  final String? filename;
+  final int? fileSizeBytes;
   final DateTime sentAt;
   final String status;
 
@@ -25,6 +27,8 @@ class Message {
     this.url,
     this.mimeType,
     this.caption,
+    this.filename,
+    this.fileSizeBytes,
     required this.sentAt,
     required this.status,
   });
@@ -64,6 +68,10 @@ class Message {
       url: url,
       mimeType: json['mimeType']?.toString() ?? json['mime_type']?.toString(),
       caption: json['caption']?.toString(),
+      filename: json['filename']?.toString(),
+      fileSizeBytes: _toOptionalInt(
+        json['fileSize'] ?? json['fileSizeBytes'] ?? json['size'],
+      ),
       sentAt: DateTime.parse(rawSentAt),
       status: (json['status'] ?? 'PENDING').toString().toUpperCase(),
     );
@@ -73,5 +81,12 @@ class Message {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static int? _toOptionalInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 }

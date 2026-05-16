@@ -40,6 +40,32 @@ class ApiService {
     );
   }
 
+  Future<Message> sendReplyVideo(
+    int conversationId, {
+    required String mediaUrl,
+    String? caption,
+  }) {
+    return _conversationService.sendReplyVideo(
+      conversationId,
+      mediaUrl: mediaUrl,
+      caption: caption,
+    );
+  }
+
+  Future<Message> sendReplyDocument(
+    int conversationId, {
+    required String mediaUrl,
+    required String filename,
+    String? caption,
+  }) {
+    return _conversationService.sendReplyDocument(
+      conversationId,
+      mediaUrl: mediaUrl,
+      filename: filename,
+      caption: caption,
+    );
+  }
+
   Future<Message> sendContactCard(int conversationId) {
     return _conversationService.sendContactCard(conversationId);
   }

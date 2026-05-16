@@ -5,7 +5,9 @@ import '../theme/wa_colors.dart';
 import '../theme/wa_text_styles.dart';
 import '../utils/message_media_url.dart';
 import '../utils/message_text_utils.dart';
+import 'document_bubble.dart';
 import 'message_media_content.dart';
+import 'video_bubble.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -137,12 +139,18 @@ class MessageBubble extends StatelessWidget {
   Widget _buildContent(BuildContext context) {
     final messageType = message.messageType.toUpperCase();
 
+    if (messageType == 'VIDEO') {
+      return VideoBubble(message: message);
+    }
+
+    if (messageType == 'DOCUMENT') {
+      return DocumentBubble(message: message);
+    }
+
     if (messageType == 'IMAGE' ||
         messageType == 'STICKER' ||
-        messageType == 'VIDEO' ||
         messageType == 'AUDIO' ||
-        messageType == 'VOICE' ||
-        messageType == 'DOCUMENT') {
+        messageType == 'VOICE') {
       return MessageMediaContent(message: message, onTap: onImageTap);
     }
 

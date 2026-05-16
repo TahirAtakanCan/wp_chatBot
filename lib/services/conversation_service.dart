@@ -71,20 +71,69 @@ class ConversationService {
     required String imageUrl,
     String? caption,
   }) async {
-    final body = <String, dynamic>{
-      'imageUrl': imageUrl,
-      if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
-    };
+    return _postReplyMedia(
+      conversationId,
+      'reply-image',
+      {
+        'imageUrl': imageUrl,
+        if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+      },
+      fallbackError: 'Resim gonderilemedi',
+    );
+  }
 
+  Future<Message> sendReplyVideo(
+    int conversationId, {
+    required String mediaUrl,
+    String? caption,
+  }) async {
+    return _postReplyMedia(
+      conversationId,
+      'reply-video',
+      {
+        'mediaUrl': mediaUrl,
+        if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+      },
+      fallbackError: 'Video gonderilemedi',
+    );
+  }
+
+  Future<Message> sendReplyDocument(
+    int conversationId, {
+    required String mediaUrl,
+    required String filename,
+    String? caption,
+  }) async {
+    return _postReplyMedia(
+      conversationId,
+      'reply-document',
+      {
+        'mediaUrl': mediaUrl,
+        'filename': filename,
+        if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+      },
+      fallbackError: 'Belge gonderilemedi',
+    );
+  }
+
+  Future<Message> _postReplyMedia(
+    int conversationId,
+    String endpointSuffix,
+    Map<String, dynamic> body, {
+    required String fallbackError,
+  }) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/conversations/$conversationId/reply-image'),
+      Uri.parse('$_baseUrl/api/conversations/$conversationId/$endpointSuffix'),
       headers: await _getHeaders(),
       body: utf8.encode(jsonEncode(body)),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      return Message.fromJson(decoded);
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is Map<String, dynamic>) {
+        return Message.fromJson(decoded);
+      }
+      throw ApiException('Gecersiz yanit', statusCode: response.statusCode);
     }
 
     final errorBody = _decodeAsMap(response.body);
@@ -105,7 +154,7 @@ class ConversationService {
     }
 
     throw ApiException(
-      errorBody['message']?.toString() ?? 'Resim gonderilemedi',
+      errorBody['message']?.toString() ?? fallbackError,
       statusCode: response.statusCode,
     );
   }

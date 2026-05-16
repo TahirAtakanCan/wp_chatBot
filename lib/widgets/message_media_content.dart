@@ -29,20 +29,8 @@ class MessageMediaContent extends StatelessWidget {
       return _buildImage(context, caption, maxHeight: 140);
     }
 
-    if (type == 'VIDEO') {
-      return _placeholder(Icons.videocam_rounded, 'Video', subtitle: caption);
-    }
-
     if (type == 'AUDIO' || type == 'VOICE') {
       return _placeholder(Icons.mic_rounded, 'Ses mesaji', subtitle: caption);
-    }
-
-    if (type == 'DOCUMENT') {
-      return _placeholder(
-        Icons.insert_drive_file_outlined,
-        message.content?.trim().isNotEmpty == true ? message.content!.trim() : 'Dosya',
-        subtitle: caption,
-      );
     }
 
     return _placeholder(Icons.attach_file, 'Medya', subtitle: caption);
