@@ -149,17 +149,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendReply() async {
-    final rawText = _replyController.text;
-    // === DEBUG START ===
-    debugPrint('[CHATSCREEN DEBUG] raw text=[$rawText] length=${rawText.length}');
-    final trimmed = rawText.trim();
-    debugPrint('[CHATSCREEN DEBUG] after trim=[$trimmed] length=${trimmed.length}');
-    debugPrint('[CHATSCREEN DEBUG] isEmpty=${trimmed.isEmpty}');
-    debugPrint('[CHATSCREEN DEBUG] isSending=$_isSending');
-    // === DEBUG END ===
-    if (trimmed.isEmpty || _isSending || _conversation == null) return;
+    final text = _replyController.text.trim();
+    if (text.isEmpty || _isSending || _conversation == null) return;
     _replyController.clear();
-    await _sendText(trimmed);
+    await _sendText(text);
   }
 
   Future<void> _pickAndSendImage() async {

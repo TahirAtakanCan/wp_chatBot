@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -72,20 +70,6 @@ class _ChatComposerState extends State<ChatComposer>
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _handleSend() {
-    final text = widget.controller.text;
-    // === DEBUG START ===
-    debugPrint('[COMPOSER DEBUG] text=[$text]');
-    debugPrint('[COMPOSER DEBUG] length=${text.length}');
-    debugPrint('[COMPOSER DEBUG] codeUnits=${text.codeUnits}');
-    debugPrint('[COMPOSER DEBUG] runes=${text.runes.toList()}');
-    debugPrint('[COMPOSER DEBUG] bytes=${utf8.encode(text)}');
-    debugPrint('[COMPOSER DEBUG] isEmpty=${text.isEmpty}');
-    debugPrint('[COMPOSER DEBUG] trim.isEmpty=${text.trim().isEmpty}');
-    // === DEBUG END ===
-    widget.onSend();
-  }
-
   @override
   Widget build(BuildContext context) {
     final isEnabled = widget.enabled && !widget.isSending;
@@ -142,7 +126,7 @@ class _ChatComposerState extends State<ChatComposer>
                             return KeyEventResult.ignored;
                           }
                           if (canSend) {
-                            _handleSend();
+                            widget.onSend();
                             return KeyEventResult.handled;
                           }
                         }
@@ -261,7 +245,7 @@ class _ChatComposerState extends State<ChatComposer>
       onTap: () {
         if (!isEnabled) return;
         if (_hasText) {
-          _handleSend();
+          widget.onSend();
         } else {
           _showSnack('Yakında: ses kaydı');
         }
