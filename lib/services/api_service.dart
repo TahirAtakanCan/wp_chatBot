@@ -1,16 +1,21 @@
 import '../models/conversation.dart';
 import '../models/delivery_record.dart';
+import '../models/meta_template.dart';
 import '../models/message.dart';
+import '../models/template_preset.dart';
 import 'conversation_service.dart';
 import 'delivery_service.dart';
+import 'template_service.dart';
 
 class ApiService {
   final ConversationService _conversationService;
   final DeliveryService _deliveryService;
+  final TemplateService _templateService;
 
   ApiService({ConversationService? conversationService})
       : _conversationService = conversationService ?? ConversationService(),
-        _deliveryService = DeliveryService();
+        _deliveryService = DeliveryService(),
+        _templateService = TemplateService();
 
   Future<List<Conversation>> fetchConversations({int page = 0, int size = 50}) {
     return _conversationService.fetchConversations(page: page, size: size);
@@ -118,5 +123,67 @@ class ApiService {
 
   Future<int> purgeOldDeliveries({int days = 2}) {
     return _deliveryService.purgeOlderThan(days: days);
+  }
+
+  Future<List<MetaTemplate>> fetchMetaTemplates() {
+    return _templateService.fetchMetaTemplates();
+  }
+
+  Future<List<MetaTemplate>> refreshMetaTemplates() {
+    return _templateService.refreshMetaTemplates();
+  }
+
+  Future<List<TemplatePreset>> fetchTemplatePresets() {
+    return _templateService.fetchPresets();
+  }
+
+  Future<TemplatePreset> createTemplatePreset({
+    required String displayName,
+    required String metaTemplateName,
+    String language = 'tr',
+    String? mediaType,
+    String? mediaUrl,
+    String? mediaFilename,
+    int? mediaSizeBytes,
+    String? mimeType,
+  }) {
+    return _templateService.createPreset(
+      displayName: displayName,
+      metaTemplateName: metaTemplateName,
+      language: language,
+      mediaType: mediaType,
+      mediaUrl: mediaUrl,
+      mediaFilename: mediaFilename,
+      mediaSizeBytes: mediaSizeBytes,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<TemplatePreset> updateTemplatePreset(
+    int id, {
+    required String displayName,
+    String? mediaType,
+    String? mediaUrl,
+    String? mediaFilename,
+    int? mediaSizeBytes,
+    String? mimeType,
+    String? metaTemplateName,
+    String language = 'tr',
+  }) {
+    return _templateService.updatePreset(
+      id,
+      displayName: displayName,
+      mediaType: mediaType,
+      mediaUrl: mediaUrl,
+      mediaFilename: mediaFilename,
+      mediaSizeBytes: mediaSizeBytes,
+      mimeType: mimeType,
+      metaTemplateName: metaTemplateName,
+      language: language,
+    );
+  }
+
+  Future<void> deleteTemplatePreset(int id) {
+    return _templateService.deletePreset(id);
   }
 }

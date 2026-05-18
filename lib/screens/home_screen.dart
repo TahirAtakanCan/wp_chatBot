@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ihh_project_chatbot/screens/contacts_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../screens/templates_screen.dart';
+import '../screens/template_management_screen.dart';
 import '../screens/user_management_screen.dart';
 import '../screens/messaging_screen.dart';
 import '../screens/login_screen.dart';
@@ -10,7 +10,7 @@ import '../screens/delivery_history_screen.dart';
 import '../services/session_service.dart';
 import '../theme/wa_colors.dart';
 import '../widgets/contact_list_panel.dart';
-import '../widgets/message_content_panel.dart';
+import '../widgets/preset_message_content_panel.dart';
 import '../widgets/action_panel.dart';
 import '../widgets/progress_log_panel.dart';
 import '../widgets/responsive_layout.dart';
@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         onTemplates: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const TemplatesScreen()),
+          MaterialPageRoute(builder: (_) => const TemplateManagementScreen()),
         ),
         onLogout: () async {
           await context.read<AuthProvider>().logout();
@@ -219,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const TemplatesScreen(),
+                  builder: (_) => const TemplateManagementScreen(),
                 ),
               ),
               icon: const Icon(Icons.bookmark, size: 22),
@@ -333,12 +333,35 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     flex: 6,
                     child: Column(
-                      children: const [
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: WAColors.divider),
+                          ),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.bookmark_outline_rounded,
+                              color: WAColors.accent,
+                            ),
+                            title: const Text('Şablonlarım'),
+                            subtitle: const Text('Hazır gönderim kayıtları'),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const TemplateManagementScreen(),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Expanded(
                           child: MessageContentPanel(),
                         ),
-                        SizedBox(height: 12),
-                        ActionPanel(),
+                        const SizedBox(height: 12),
+                        const ActionPanel(),
                       ],
                     ),
                   ),

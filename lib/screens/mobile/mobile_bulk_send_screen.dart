@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../contacts_screen.dart';
 import '../../widgets/action_panel.dart';
 import '../../widgets/contact_list_panel.dart';
-import '../../widgets/message_content_panel.dart';
+import '../../widgets/preset_message_content_panel.dart';
 import '../../widgets/progress_log_panel.dart';
 
 class MobileBulkSendScreen extends StatefulWidget {
@@ -54,7 +54,7 @@ class _MobileBulkSendScreenState extends State<MobileBulkSendScreen> {
             ),
             const SizedBox(height: 12),
             _SectionCard(
-              title: 'Mesaj / Template',
+              title: 'Hazır Kayıt',
               child: SizedBox(
                 height: 360,
                 child: MessageContentPanel(),

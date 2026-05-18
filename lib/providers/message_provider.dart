@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../models/bulk_media_attachment.dart';
 import '../models/sending_state.dart';
+import '../models/template_preset.dart';
 
 class MessageProvider extends ChangeNotifier {
   // --- API Ayarları ---
@@ -40,6 +41,13 @@ class MessageProvider extends ChangeNotifier {
 
   // --- Mesaj İçeriği ---
   final TextEditingController messageController = TextEditingController();
+  TemplatePreset? _selectedPreset;
+  TemplatePreset? get selectedPreset => _selectedPreset;
+
+  void setSelectedPreset(TemplatePreset? preset) {
+    _selectedPreset = preset;
+    notifyListeners();
+  }
 
   static const String messageSplitMarker = '✂ ── Mesaj Ayrımı ──';
 
@@ -200,27 +208,34 @@ class MessageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Map<String, dynamic>> _buildMediaPayload() {
-    return _mediaAttachments
-        .map(
-          (m) => {
-            'url': m.url,
-            'type': m.kind.apiValue,
-            'fileName': m.filename,
-            'size': m.sizeBytes,
-          },
-        )
-        .toList();
+  List<Map<String, dynamic>> _buildPresetMediaPayload() {
+    final preset = _selectedPreset;
+    if (preset == null || !preset.hasMedia) return const [];
+    return [
+      {
+        'url': preset.mediaUrl,
+        'type': (preset.mediaType ?? '').toUpperCase(),
+        'fileName': preset.mediaFilename ?? 'media',
+        'size': preset.mediaSizeBytes,
+      },
+    ];
   }
 
-  void _applyRootMediaFields(Map<String, dynamic> requestBody) {
-    if (_mediaAttachments.isEmpty) return;
-    final first = _mediaAttachments.first;
-    requestBody['mediaUrl'] = first.url;
-    requestBody['mediaType'] = first.kind.apiValue;
-    requestBody['filename'] = first.filename;
-    if (first.kind == BulkMediaKind.image) {
-      requestBody['imageUrl'] = first.url;
+  void _applyPresetFields(Map<String, dynamic> requestBody) {
+    final preset = _selectedPreset;
+    if (preset == null) return;
+
+    requestBody['templateName'] = preset.metaTemplateName;
+    requestBody['templateLanguage'] = preset.language;
+    requestBody['presetId'] = preset.id;
+
+    if (preset.hasMedia) {
+      requestBody['mediaUrl'] = preset.mediaUrl;
+      requestBody['mediaType'] = (preset.mediaType ?? '').toUpperCase();
+      requestBody['filename'] = preset.mediaFilename;
+      if ((preset.mediaType ?? '').toUpperCase() == 'IMAGE') {
+        requestBody['imageUrl'] = preset.mediaUrl;
+      }
     }
   }
 
@@ -413,16 +428,8 @@ class MessageProvider extends ChangeNotifier {
       _addLog('[HATA] Gönderilecek telefon numarası bulunamadı.');
       return;
     }
-    if (messageController.text.trim().isEmpty && !hasMedia) {
-      _addLog('[HATA] Lütfen bir mesaj metni veya medya ekleyin.');
-      return;
-    }
-
-    if (hasNonImageMedia) {
-      _addLog(
-        '[UYARI] Video/Belge gönderimi için Meta\'da uygun template header '
-        'gerekir. Şimdilik toplu gönderimde yalnızca RESİM destekleniyor.',
-      );
+    if (_selectedPreset == null) {
+      _addLog('[HATA] Lütfen bir hazır kayıt seçin.');
       return;
     }
 
@@ -462,10 +469,9 @@ class MessageProvider extends ChangeNotifier {
             'maxDelay': maxDelay,
             'media': [],
           };
-
-          if (i == 0 && _mediaAttachments.isNotEmpty) {
-            (requestBody['media'] as List).addAll(_buildMediaPayload());
-            _applyRootMediaFields(requestBody);
+          _applyPresetFields(requestBody);
+          if (i == 0) {
+            (requestBody['media'] as List).addAll(_buildPresetMediaPayload());
           }
 
           final authHeaders = await _getAuthHeaders();
@@ -487,7 +493,7 @@ class MessageProvider extends ChangeNotifier {
             break;
           }
         }
-      } else if (hasMedia) {
+      } else {
         Map<String, dynamic> requestBody = {
           'phoneNumbers': _phoneNumbers,
           'message': '',
@@ -497,8 +503,8 @@ class MessageProvider extends ChangeNotifier {
           'maxDelay': maxDelay,
           'media': [],
         };
-        (requestBody['media'] as List).addAll(_buildMediaPayload());
-        _applyRootMediaFields(requestBody);
+        _applyPresetFields(requestBody);
+        (requestBody['media'] as List).addAll(_buildPresetMediaPayload());
         final authHeaders = await _getAuthHeaders();
         final response = await http.post(
           Uri.parse('$_baseUrl/start'),
@@ -616,6 +622,11 @@ class MessageProvider extends ChangeNotifier {
 
     if (_status != SendingStatus.paused) return;
 
+    if (_selectedPreset == null) {
+      _addLog('[HATA] Devam etmek için bir hazır kayıt seçin.');
+      return;
+    }
+
     parsePhoneNumbers();
 
     if (_phoneNumbers.isEmpty) {
@@ -652,11 +663,8 @@ class MessageProvider extends ChangeNotifier {
         'maxDelay': maxDelay,
         'media': [],
       };
-
-      if (_mediaAttachments.isNotEmpty) {
-        (requestBody['media'] as List).addAll(_buildMediaPayload());
-        _applyRootMediaFields(requestBody);
-      }
+      _applyPresetFields(requestBody);
+      (requestBody['media'] as List).addAll(_buildPresetMediaPayload());
 
       final previousSent = _sentCount;
       final authHeaders = await _getAuthHeaders();
@@ -748,6 +756,7 @@ class MessageProvider extends ChangeNotifier {
     _sendJobId = null;
     _rateLimitedSessionId = null;
     _isResumingRateLimited = false;
+    _selectedPreset = null;
     _logs.clear();
     _mediaAttachments.clear();
     _base64MediaList.clear();

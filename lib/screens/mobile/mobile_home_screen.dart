@@ -48,7 +48,7 @@ class MobileHomeScreen extends StatelessWidget {
       _HomeMenuItem(
         icon: Icons.bookmark_border,
         title: 'Sablonlarim',
-        subtitle: 'Mesaj sablonlari',
+        subtitle: 'Hazir gonderim kayitlari',
         onTap: onTemplates,
       ),
     ];
