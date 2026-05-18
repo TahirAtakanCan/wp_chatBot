@@ -19,48 +19,52 @@ class VideoBubble extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onTap: mediaUrl == null
-              ? null
-              : () async {
-                  try {
-                    await openMediaUrl(mediaUrl);
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Video açılamadı: $e')),
-                    );
-                  }
-                },
-          child: Container(
-            width: 260,
-            height: 160,
-            decoration: BoxDecoration(
-              color: WAColors.composerBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(
-                  Icons.movie_creation_outlined,
-                  size: 48,
-                  color: WAColors.textTertiary.withValues(alpha: 0.7),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280, maxHeight: 180),
+          child: GestureDetector(
+            onTap: mediaUrl == null
+                ? null
+                : () async {
+                    try {
+                      await openMediaUrl(mediaUrl);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Video açılamadı: $e')),
+                      );
+                    }
+                  },
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: WAColors.composerBg,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 34,
-                  ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      Icons.movie_creation_outlined,
+                      size: 44,
+                      color: WAColors.textTertiary.withValues(alpha: 0.7),
+                    ),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

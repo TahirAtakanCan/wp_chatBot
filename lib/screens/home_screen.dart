@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:ihh_project_chatbot/screens/contacts_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../screens/session_management_screen.dart';
 import '../screens/templates_screen.dart';
 import '../screens/user_management_screen.dart';
 import '../screens/messaging_screen.dart';
@@ -226,24 +225,6 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.bookmark, size: 22),
             ),
           ),
-          const SizedBox(width: 8),
-          // WhatsApp Hesap Yönetimi (sadece ADMIN)
-          if (context.read<AuthProvider>().isAdmin)
-            Tooltip(
-              message: 'Entegrasyon Durumu',
-              child: IconButton.filledTonal(
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SessionManagementScreen(),
-                    ),
-                  );
-                  _checkMetaApiConnection();
-                },
-                icon: const Icon(Icons.monitor_heart_outlined, size: 22),
-              ),
-            ),
           const SizedBox(width: 8),
           // Kullanıcı Yönetimi (sadece ADMIN)
           if (context.read<AuthProvider>().isAdmin)

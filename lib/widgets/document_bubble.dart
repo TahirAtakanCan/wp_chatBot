@@ -22,86 +22,53 @@ class DocumentBubble extends StatelessWidget {
         ? '${formatFileSizeMb(message.fileSizeBytes!)} MB'
         : null;
 
+    final metadata = [
+      if (sizeLabel != null) sizeLabel,
+      if (extension != null) extension,
+    ].join(' · ');
+    final lineText =
+        metadata.isEmpty ? displayName : '$displayName · $metadata';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 280,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Material(
             color: WAColors.composerBg,
             borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.insert_drive_file_outlined,
-                    size: 32,
-                    color: WAColors.accent,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: WATextStyles.messageBody.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          [
-                            if (sizeLabel != null) sizeLabel,
-                            if (extension != null) extension,
-                          ].join(' · '),
-                          style: WATextStyles.messageTime,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (mediaUrl != null) ...[
-                const SizedBox(height: 8),
-                Row(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: mediaUrl == null ? null : () => _openUrl(context, mediaUrl),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Row(
                   children: [
-                    TextButton(
-                      onPressed: () => _openUrl(context, mediaUrl),
-                      style: TextButton.styleFrom(
-                        foregroundColor: WAColors.accent,
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text('İndir'),
+                    const Icon(
+                      Icons.insert_drive_file_outlined,
+                      size: 20,
+                      color: WAColors.accent,
                     ),
-                    const SizedBox(width: 12),
-                    TextButton(
-                      onPressed: () => _openUrl(context, mediaUrl),
-                      style: TextButton.styleFrom(
-                        foregroundColor: WAColors.accent,
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        lineText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: WATextStyles.messageBody.copyWith(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      child: const Text('Aç'),
                     ),
                   ],
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
         ),
         if (caption != null && caption.isNotEmpty) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(caption, style: WATextStyles.messageBody),
         ],
       ],

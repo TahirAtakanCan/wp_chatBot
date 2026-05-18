@@ -27,29 +27,25 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isInbound = message.isInbound;
     final alignment = isInbound ? Alignment.centerLeft : Alignment.centerRight;
-    final background =
-        isInbound ? WAColors.bubbleInbound : WAColors.bubbleOutbound;
+    final background = isInbound ? Colors.white : const Color(0xFFDCF8C6);
     final status = message.status.toUpperCase();
-    final isMedia = _isMediaMessage(message);
 
     return Align(
       alignment: alignment,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final maxWidth = constraints.maxWidth;
-          final widthFactor = maxWidth >= 1024 ? 0.65 : 0.75;
+          final availableWidth = constraints.maxWidth;
+          final compactWidth = availableWidth * 0.58;
+          final maxBubbleWidth =
+              compactWidth > 440 ? 440.0 : compactWidth;
 
           return ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: maxWidth * widthFactor,
+              maxWidth: maxBubbleWidth,
             ),
             child: Container(
-              padding: EdgeInsets.fromLTRB(
-                isMedia ? 6 : 12,
-                isMedia ? 6 : 8,
-                isMedia ? 6 : 12,
-                6,
-              ),
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: background,
                 borderRadius: _bubbleRadius(isInbound, isFirstInGroup),
@@ -77,7 +73,11 @@ class MessageBubble extends StatelessWidget {
                     children: [
                       Text(
                         _formatHourMinute(message.sentAt),
-                        style: WATextStyles.messageTime,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
                       if (message.isOutbound) ...[
                         const SizedBox(width: 4),
@@ -122,20 +122,6 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  bool _isMediaMessage(Message message) {
-    final type = message.messageType.toUpperCase();
-    if (type == 'IMAGE' ||
-        type == 'STICKER' ||
-        type == 'VIDEO' ||
-        type == 'AUDIO' ||
-        type == 'VOICE' ||
-        type == 'DOCUMENT') {
-      return true;
-    }
-    return isMediaPlaceholderContent(message.content) &&
-        resolveMessageMediaUrl(message) != null;
-  }
-
   Widget _buildContent(BuildContext context) {
     final messageType = message.messageType.toUpperCase();
 
@@ -161,14 +147,17 @@ class MessageBubble extends StatelessWidget {
 
     return Text(
       normalizeMessageContent(message.content),
-      style: WATextStyles.messageBody,
+      style: WATextStyles.messageBody.copyWith(
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
+      ),
     );
   }
 
   BorderRadius _bubbleRadius(bool isInbound, bool isFirst) {
-    const grouped = 14.0;
+    const grouped = 12.0;
     const tail = 4.0;
-    const corner = 18.0;
+    const corner = 12.0;
 
     if (!isFirst) {
       return BorderRadius.circular(grouped);
@@ -198,11 +187,11 @@ class MessageBubble extends StatelessWidget {
       case 'SENDING':
         return const Icon(
           Icons.access_time,
-          size: 10,
+          size: 14,
           color: WAColors.statusDefault,
         );
       case 'SENT':
-        return const Icon(Icons.done, size: 12, color: WAColors.statusDefault);
+        return const Icon(Icons.done, size: 14, color: WAColors.statusDefault);
       case 'DELIVERED':
         return const Icon(
           Icons.done_all,
@@ -218,7 +207,7 @@ class MessageBubble extends StatelessWidget {
       case 'FAILED':
         return const Icon(
           Icons.error_outline,
-          size: 12,
+          size: 14,
           color: WAColors.errorRed,
         );
       default:

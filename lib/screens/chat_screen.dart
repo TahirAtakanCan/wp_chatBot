@@ -1214,9 +1214,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final horizontalPadding =
-            width >= 1024 ? 64.0 : (width >= 768 ? 24.0 : 16.0);
+        const horizontalPadding = 8.0;
 
         return ListView.builder(
           controller: _scrollController,
@@ -1241,16 +1239,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 previous.direction != message.direction ||
                 prevWasSeparator;
 
-            double topSpacing = 4;
-            if (previous != null) {
-              if (prevWasSeparator) {
-                topSpacing = 4;
-              } else if (previous.direction == message.direction) {
-                topSpacing = 2;
-              } else {
-                topSpacing = 8;
-              }
-            }
+            final topSpacing = previous == null ? 0.0 : 4.0;
 
             return Padding(
               padding: EdgeInsets.only(top: topSpacing),
