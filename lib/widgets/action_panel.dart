@@ -14,6 +14,7 @@ class ActionPanel extends StatelessWidget {
     final provider = context.watch<MessageProvider>();
     final isSending = provider.status == SendingStatus.sending;
     final isPaused = provider.status == SendingStatus.paused;
+    final hasPreset = provider.selectedPreset != null;
 
     if (compact) {
       return Card(
@@ -26,7 +27,8 @@ class ActionPanel extends StatelessWidget {
                 width: double.infinity,
                 height: 48,
                 child: FilledButton.icon(
-                  onPressed: isSending || isPaused ? null : provider.startSending,
+                  onPressed:
+                      isSending || isPaused || !hasPreset ? null : provider.startSending,
                   icon: const Icon(Icons.play_arrow_rounded, size: 22),
                   label: const Text(
                     'Gonderimi Baslat',
@@ -120,7 +122,8 @@ class ActionPanel extends StatelessWidget {
             // Başlat butonu
             Expanded(
               child: FilledButton.icon(
-                onPressed: isSending || isPaused ? null : provider.startSending,
+                onPressed:
+                    isSending || isPaused || !hasPreset ? null : provider.startSending,
                 icon: const Icon(Icons.play_arrow_rounded, size: 22),
                 label: const Text(
                   'Gönderimi Başlat',

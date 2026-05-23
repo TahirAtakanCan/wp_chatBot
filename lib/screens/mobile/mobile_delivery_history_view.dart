@@ -13,6 +13,7 @@ class MobileDeliveryHistoryView extends StatelessWidget {
   final ScrollController scrollController;
   final String? purgeMessage;
   final VoidCallback onRefresh;
+  final VoidCallback onExportExcel;
   final ValueChanged<DeliveryStatus?> onFilterChanged;
   final ValueChanged<String> onSortChanged;
   final ValueChanged<DeliveryRecord> onRecordTap;
@@ -29,6 +30,7 @@ class MobileDeliveryHistoryView extends StatelessWidget {
     required this.scrollController,
     this.purgeMessage,
     required this.onRefresh,
+    required this.onExportExcel,
     required this.onFilterChanged,
     required this.onSortChanged,
     required this.onRecordTap,
@@ -50,6 +52,11 @@ class MobileDeliveryHistoryView extends StatelessWidget {
             onPressed: onRefresh,
             tooltip: 'Yenile',
             icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            onPressed: onExportExcel,
+            tooltip: 'Excel indir',
+            icon: const Icon(Icons.download_rounded),
           ),
         ],
       ),

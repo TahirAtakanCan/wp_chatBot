@@ -119,6 +119,9 @@ class _PresetFormDialogState extends State<PresetFormDialog> {
         _selectedFilename = upload.filename;
         _selectedSize = upload.sizeBytes;
         _selectedMimeType = _guessMimeType(file.name);
+        if (_displayNameController.text.trim().isEmpty) {
+          _displayNameController.text = _filenameBase(upload.filename);
+        }
         _isUploading = false;
       });
     } catch (e) {
@@ -188,6 +191,7 @@ class _PresetFormDialogState extends State<PresetFormDialog> {
               const SizedBox(height: 14),
               TextField(
                 controller: _displayNameController,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: 'Kayıt İsmi',
                   hintText: 'Örn: Afrika Kurban Bayramı',
@@ -359,5 +363,11 @@ class _PresetFormDialogState extends State<PresetFormDialog> {
       default:
         return 'application/octet-stream';
     }
+  }
+
+  String _filenameBase(String filename) {
+    final dotIndex = filename.lastIndexOf('.');
+    if (dotIndex <= 0) return filename;
+    return filename.substring(0, dotIndex);
   }
 }

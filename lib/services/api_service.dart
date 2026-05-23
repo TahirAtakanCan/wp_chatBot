@@ -1,5 +1,7 @@
 import '../models/conversation.dart';
 import '../models/delivery_record.dart';
+import '../models/export_options.dart';
+import '../models/failure_category.dart';
 import '../models/meta_template.dart';
 import '../models/message.dart';
 import '../models/template_preset.dart';
@@ -123,6 +125,18 @@ class ApiService {
 
   Future<int> purgeOldDeliveries({int days = 2}) {
     return _deliveryService.purgeOlderThan(days: days);
+  }
+
+  Future<void> downloadDeliveryExcel({DeliveryStatus? status, int? days}) {
+    return _deliveryService.downloadExcel(status: status, days: days);
+  }
+
+  Future<List<FailureCategory>> fetchFailureCategories() {
+    return _deliveryService.fetchFailureCategories();
+  }
+
+  Future<void> downloadExcelWithOptions(ExportOptions options) {
+    return _deliveryService.downloadExcelWithOptions(options);
   }
 
   Future<List<MetaTemplate>> fetchMetaTemplates() {

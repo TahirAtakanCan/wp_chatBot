@@ -226,6 +226,8 @@ class MessageProvider extends ChangeNotifier {
     if (preset == null) return;
 
     requestBody['templateName'] = preset.metaTemplateName;
+    requestBody['template'] = preset.metaTemplateName;
+    requestBody['language'] = preset.language;
     requestBody['templateLanguage'] = preset.language;
     requestBody['presetId'] = preset.id;
 
@@ -423,6 +425,9 @@ class MessageProvider extends ChangeNotifier {
   debugPrint('phoneNumbers: $_phoneNumbers');
   debugPrint('isPersonalized: $_personalizedMessage');
   debugPrint('messages: $splitMessages');
+  debugPrint('templateName: ${_selectedPreset?.metaTemplateName}');
+  debugPrint('mediaUrl: ${_selectedPreset?.mediaUrl}');
+  debugPrint('mediaType: ${_selectedPreset?.mediaType}');
 
     if (_phoneNumbers.isEmpty) {
       _addLog('[HATA] Gönderilecek telefon numarası bulunamadı.');
@@ -473,6 +478,9 @@ class MessageProvider extends ChangeNotifier {
           if (i == 0) {
             (requestBody['media'] as List).addAll(_buildPresetMediaPayload());
           }
+          debugPrint('requestBody.templateName: ${requestBody['templateName']}');
+          debugPrint('requestBody.mediaUrl: ${requestBody['mediaUrl']}');
+          debugPrint('requestBody.mediaType: ${requestBody['mediaType']}');
 
           final authHeaders = await _getAuthHeaders();
           final response = await http.post(
@@ -505,6 +513,9 @@ class MessageProvider extends ChangeNotifier {
         };
         _applyPresetFields(requestBody);
         (requestBody['media'] as List).addAll(_buildPresetMediaPayload());
+        debugPrint('requestBody.templateName: ${requestBody['templateName']}');
+        debugPrint('requestBody.mediaUrl: ${requestBody['mediaUrl']}');
+        debugPrint('requestBody.mediaType: ${requestBody['mediaType']}');
         final authHeaders = await _getAuthHeaders();
         final response = await http.post(
           Uri.parse('$_baseUrl/start'),

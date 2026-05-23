@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../theme/wa_colors.dart';
 import '../utils/delivery_filters.dart';
 import '../widgets/delivery_status_icon.dart';
+import '../widgets/export_options_dialog.dart';
 import '../widgets/responsive_layout.dart';
 import 'mobile/mobile_delivery_history_view.dart';
 
@@ -26,6 +27,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
   bool _hasMore = true;
   int _page = 0;
   DeliveryStatus? _filterStatus;
+  int? _selectedDays;
   String _sortKey = 'sentAt_desc';
   String? _purgeMessage;
 
@@ -194,6 +196,16 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
     _loadRecords(reset: true);
   }
 
+  Future<void> _openExportDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => ExportOptionsDialog(
+        initialStatus: _filterStatus,
+        initialDays: _selectedDays,
+      ),
+    );
+  }
+
   _SortOption _resolveSort() {
     switch (_sortKey) {
       case 'sentAt_asc':
@@ -299,6 +311,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
         scrollController: _scrollController,
         purgeMessage: _purgeMessage,
         onRefresh: _bootstrap,
+        onExportExcel: _openExportDialog,
         onFilterChanged: _setFilter,
         onSortChanged: _setSort,
         onRecordTap: _showHistoryForPhone,
@@ -334,6 +347,11 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
             onPressed: _bootstrap,
             tooltip: 'Yenile',
             icon: const Icon(Icons.refresh_rounded),
+          ),
+          IconButton(
+            onPressed: _openExportDialog,
+            tooltip: 'Excel olarak indir',
+            icon: const Icon(Icons.download_rounded),
           ),
         ],
       ),
