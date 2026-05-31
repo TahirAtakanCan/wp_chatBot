@@ -6,6 +6,7 @@ class MobileHomeScreen extends StatelessWidget {
   final VoidCallback onDeliveryHistory;
   final VoidCallback onContacts;
   final VoidCallback onTemplates;
+  final VoidCallback onAutoReplies;
   final VoidCallback onLogout;
 
   const MobileHomeScreen({
@@ -15,6 +16,7 @@ class MobileHomeScreen extends StatelessWidget {
     required this.onDeliveryHistory,
     required this.onContacts,
     required this.onTemplates,
+    required this.onAutoReplies,
     required this.onLogout,
   });
 
@@ -50,6 +52,12 @@ class MobileHomeScreen extends StatelessWidget {
         title: 'Sablonlarim',
         subtitle: 'Hazir gonderim kayitlari',
         onTap: onTemplates,
+      ),
+      _HomeMenuItem(
+        icon: Icons.auto_awesome_outlined,
+        title: 'Otomatik Yanitlar',
+        subtitle: 'Anahtar kelime + hazir cevap',
+        onTap: onAutoReplies,
       ),
     ];
 

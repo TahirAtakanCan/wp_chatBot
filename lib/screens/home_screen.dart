@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ihh_project_chatbot/screens/contacts_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../screens/auto_reply_management_screen.dart';
 import '../screens/template_management_screen.dart';
 import '../screens/user_management_screen.dart';
 import '../screens/messaging_screen.dart';
@@ -73,6 +74,11 @@ class _HomeScreenState extends State<HomeScreen> {
         onTemplates: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const TemplateManagementScreen()),
+        ),
+        onAutoReplies: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const AutoReplyManagementScreen()),
         ),
         onLogout: () async {
           await context.read<AuthProvider>().logout();
@@ -223,6 +229,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               icon: const Icon(Icons.bookmark, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Otomatik Yanıtlar',
+            child: IconButton.filledTonal(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AutoReplyManagementScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.auto_awesome_outlined, size: 22),
             ),
           ),
           const SizedBox(width: 8),

@@ -1,3 +1,4 @@
+import '../models/auto_reply.dart';
 import '../models/conversation.dart';
 import '../models/delivery_record.dart';
 import '../models/export_options.dart';
@@ -5,6 +6,7 @@ import '../models/failure_category.dart';
 import '../models/meta_template.dart';
 import '../models/message.dart';
 import '../models/template_preset.dart';
+import 'auto_reply_service.dart';
 import 'conversation_service.dart';
 import 'delivery_service.dart';
 import 'template_service.dart';
@@ -13,11 +15,13 @@ class ApiService {
   final ConversationService _conversationService;
   final DeliveryService _deliveryService;
   final TemplateService _templateService;
+  final AutoReplyService _autoReplyService;
 
   ApiService({ConversationService? conversationService})
       : _conversationService = conversationService ?? ConversationService(),
         _deliveryService = DeliveryService(),
-        _templateService = TemplateService();
+        _templateService = TemplateService(),
+        _autoReplyService = AutoReplyService();
 
   Future<List<Conversation>> fetchConversations({int page = 0, int size = 50}) {
     return _conversationService.fetchConversations(page: page, size: size);
@@ -200,4 +204,52 @@ class ApiService {
   Future<void> deleteTemplatePreset(int id) {
     return _templateService.deletePreset(id);
   }
+
+  // Auto-reply
+  Future<List<AutoReply>> fetchAutoReplies() => _autoReplyService.fetchAll();
+
+  Future<AutoReply> createAutoReply({
+    required String category,
+    required String keywords,
+    required String replyText,
+    bool active = true,
+    int priority = 100,
+  }) =>
+      _autoReplyService.create(
+        category: category,
+        keywords: keywords,
+        replyText: replyText,
+        active: active,
+        priority: priority,
+      );
+
+  Future<AutoReply> updateAutoReply(
+    int id, {
+    required String category,
+    required String keywords,
+    required String replyText,
+    bool active = true,
+    int priority = 100,
+  }) =>
+      _autoReplyService.update(
+        id,
+        category: category,
+        keywords: keywords,
+        replyText: replyText,
+        active: active,
+        priority: priority,
+      );
+
+  Future<void> deleteAutoReply(int id) => _autoReplyService.delete(id);
+
+  Future<AutoReply> toggleAutoReply(int id) => _autoReplyService.toggle(id);
+
+  Future<AutoReplySettings> getAutoReplySettings() =>
+      _autoReplyService.getSettings();
+
+  Future<AutoReplySettings> updateAutoReplySettings(AutoReplySettings settings) =>
+      _autoReplyService.updateSettings(settings);
+
+  Future<Map<String, dynamic>> testAutoReplyMessage(String message) =>
+      _autoReplyService.testMessage(message);
 }
